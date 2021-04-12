@@ -1,0 +1,31 @@
+union AnalyticsMessageType { PageChange, PlaybackChange, PlaybackSongChange }
+
+
+table AnalyticsMessage {
+	origin      :string;
+	timestamp   :ulong;
+	payload     :AnalyticsMessageType;
+}
+
+enum Page : byte { INACTIVE = 0, LOADING, MENU_SELECTION, OPTIONS, RADIO_PLAYING, RADIO_SELECTION, BT_PLAYING, SNAPCAST_PLAYING }
+
+table PageChange {
+	origin      :Page;
+	destination :Page;
+}
+
+enum PlaybackSource : ubyte { RADIO = 0, BLUETOOTH, SNAPCAST }
+table PlaybackChange {
+	started :bool;
+	source  :PlaybackSource;
+	name    :string;
+}
+
+table PlaybackSongChange {
+    raw_meta    :string;
+    title       :string;
+    artist      :string;
+    album       :string;
+}
+
+root_type AnalyticsMessage;

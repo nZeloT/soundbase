@@ -1,0 +1,27 @@
+union MesagePayload {
+    Response, Request
+}
+table SongMessage {
+    id          :ulong;
+    origin      :string;
+    payload     :MesagePayload;
+}
+
+
+enum ResponseKind : ubyte { NOT_FOUND = 0, FOUND_NOT_FAVED, FOUND_FAVED, FOUND_NOW_FAVED, FOUND_NOW_NOT_FAVED }
+table Response {
+    kind    :ResponseKind;
+}
+
+enum SourceKind : ubyte { RADIO = 0, BLUETOOTH, SNAPCAST }
+table Request {
+    raw_metadata    :string;
+    source_kind     :SourceKind;
+    source_name     :string;
+
+    song_title      :string;
+    song_artist     :string;
+    song_album      :string;
+}
+
+root_type SongMessage;

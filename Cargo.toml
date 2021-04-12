@@ -1,0 +1,15 @@
+[package]
+name = "soundbase"
+version = "0.1.0"
+authors = ["Leon Steiner <leontsteiner@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+warp = "0.3"
+bytes = "1.0"
+flatbuffers = "0.7"
+chrono = "0.4"
+sqlite = "0.26.0"
