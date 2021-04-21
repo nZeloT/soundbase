@@ -1,0 +1,25 @@
+{
+  "sources": [
+    {
+      "source_kind": "RADIO",
+      "source_name": "Rock Antenne",
+      "dissect_regexp": "([A-Za-z0-9.() &]+) - ([A-Za-z0-9.() &]+)",
+      "mapping" : [
+        {
+          "matching_group": 1,
+          "field": "title"
+        },
+        {
+          "matching_group": 2,
+          "field": "artist"
+        }
+      ],
+      "exclude": [
+        {
+          "matching_group": 1,
+          "if_equals": "ROCK ANTENNE"
+        }
+      ]
+    }
+  ]
+}

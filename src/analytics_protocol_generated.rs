@@ -6,42 +6,65 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::EndianScalar;
+use self::flatbuffers::{EndianScalar, Follow};
 
+#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
+pub const ENUM_MIN_ANALYTICS_MESSAGE_TYPE: u8 = 0;
+#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
+pub const ENUM_MAX_ANALYTICS_MESSAGE_TYPE: u8 = 3;
+#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-#[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum AnalyticsMessageType {
-  NONE = 0,
-  PageChange = 1,
-  PlaybackChange = 2,
-  PlaybackSongChange = 3,
+pub const ENUM_VALUES_ANALYTICS_MESSAGE_TYPE: [AnalyticsMessageType; 4] = [
+  AnalyticsMessageType::NONE,
+  AnalyticsMessageType::PageChange,
+  AnalyticsMessageType::PlaybackChange,
+  AnalyticsMessageType::PlaybackSongChange,
+];
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct AnalyticsMessageType(pub u8);
+#[allow(non_upper_case_globals)]
+impl AnalyticsMessageType {
+  pub const NONE: Self = Self(0);
+  pub const PageChange: Self = Self(1);
+  pub const PlaybackChange: Self = Self(2);
+  pub const PlaybackSongChange: Self = Self(3);
+
+  pub const ENUM_MIN: u8 = 0;
+  pub const ENUM_MAX: u8 = 3;
+  pub const ENUM_VALUES: &'static [Self] = &[
+    Self::NONE,
+    Self::PageChange,
+    Self::PlaybackChange,
+    Self::PlaybackSongChange,
+  ];
+  /// Returns the variant's name or "" if unknown.
+  pub fn variant_name(self) -> Option<&'static str> {
+    match self {
+      Self::NONE => Some("NONE"),
+      Self::PageChange => Some("PageChange"),
+      Self::PlaybackChange => Some("PlaybackChange"),
+      Self::PlaybackSongChange => Some("PlaybackSongChange"),
+      _ => None,
+    }
+  }
 }
-
-const ENUM_MIN_ANALYTICS_MESSAGE_TYPE: u8 = 0;
-const ENUM_MAX_ANALYTICS_MESSAGE_TYPE: u8 = 3;
-
+impl std::fmt::Debug for AnalyticsMessageType {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    if let Some(name) = self.variant_name() {
+      f.write_str(name)
+    } else {
+      f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+    }
+  }
+}
 impl<'a> flatbuffers::Follow<'a> for AnalyticsMessageType {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    flatbuffers::read_scalar_at::<Self>(buf, loc)
-  }
-}
-
-impl flatbuffers::EndianScalar for AnalyticsMessageType {
-  #[inline]
-  fn to_little_endian(self) -> Self {
-    let n = u8::to_le(self as u8);
-    let p = &n as *const u8 as *const AnalyticsMessageType;
-    unsafe { *p }
-  }
-  #[inline]
-  fn from_little_endian(self) -> Self {
-    let n = u8::from_le(self as u8);
-    let p = &n as *const u8 as *const AnalyticsMessageType;
-    unsafe { *p }
+    let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+    Self(b)
   }
 }
 
@@ -49,70 +72,106 @@ impl flatbuffers::Push for AnalyticsMessageType {
     type Output = AnalyticsMessageType;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<AnalyticsMessageType>(dst, *self);
+        flatbuffers::emplace_scalar::<u8>(dst, self.0);
     }
 }
 
-#[allow(non_camel_case_types)]
-const ENUM_VALUES_ANALYTICS_MESSAGE_TYPE:[AnalyticsMessageType; 4] = [
-  AnalyticsMessageType::NONE,
-  AnalyticsMessageType::PageChange,
-  AnalyticsMessageType::PlaybackChange,
-  AnalyticsMessageType::PlaybackSongChange
-];
-
-#[allow(non_camel_case_types)]
-const ENUM_NAMES_ANALYTICS_MESSAGE_TYPE:[&'static str; 4] = [
-    "NONE",
-    "PageChange",
-    "PlaybackChange",
-    "PlaybackSongChange"
-];
-
-pub fn enum_name_analytics_message_type(e: AnalyticsMessageType) -> &'static str {
-  let index = e as u8;
-  ENUM_NAMES_ANALYTICS_MESSAGE_TYPE[index as usize]
+impl flatbuffers::EndianScalar for AnalyticsMessageType {
+  #[inline]
+  fn to_little_endian(self) -> Self {
+    let b = u8::to_le(self.0);
+    Self(b)
+  }
+  #[inline]
+  #[allow(clippy::wrong_self_convention)]
+  fn from_little_endian(self) -> Self {
+    let b = u8::from_le(self.0);
+    Self(b)
+  }
 }
 
+impl<'a> flatbuffers::Verifiable for AnalyticsMessageType {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    u8::run_verifier(v, pos)
+  }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for AnalyticsMessageType {}
 pub struct AnalyticsMessageTypeUnionTableOffset {}
+
+#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
+pub const ENUM_MIN_PAGE: i8 = 0;
+#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
+pub const ENUM_MAX_PAGE: i8 = 6;
+#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-#[repr(i8)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum Page {
-  INACTIVE = 0,
-  LOADING = 1,
-  MENU_SELECTION = 2,
-  OPTIONS = 3,
-  RADIO_PLAYING = 4,
-  RADIO_SELECTION = 5,
-  BT_PLAYING = 6,
-  SNAPCAST_PLAYING = 7,
+pub const ENUM_VALUES_PAGE: [Page; 7] = [
+  Page::INACTIVE,
+  Page::MENU_SELECTION,
+  Page::OPTIONS,
+  Page::RADIO_PLAYING,
+  Page::RADIO_SELECTION,
+  Page::BT_PLAYING,
+  Page::SNAPCAST_PLAYING,
+];
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct Page(pub i8);
+#[allow(non_upper_case_globals)]
+impl Page {
+  pub const INACTIVE: Self = Self(0);
+  pub const MENU_SELECTION: Self = Self(1);
+  pub const OPTIONS: Self = Self(2);
+  pub const RADIO_PLAYING: Self = Self(3);
+  pub const RADIO_SELECTION: Self = Self(4);
+  pub const BT_PLAYING: Self = Self(5);
+  pub const SNAPCAST_PLAYING: Self = Self(6);
+
+  pub const ENUM_MIN: i8 = 0;
+  pub const ENUM_MAX: i8 = 6;
+  pub const ENUM_VALUES: &'static [Self] = &[
+    Self::INACTIVE,
+    Self::MENU_SELECTION,
+    Self::OPTIONS,
+    Self::RADIO_PLAYING,
+    Self::RADIO_SELECTION,
+    Self::BT_PLAYING,
+    Self::SNAPCAST_PLAYING,
+  ];
+  /// Returns the variant's name or "" if unknown.
+  pub fn variant_name(self) -> Option<&'static str> {
+    match self {
+      Self::INACTIVE => Some("INACTIVE"),
+      Self::MENU_SELECTION => Some("MENU_SELECTION"),
+      Self::OPTIONS => Some("OPTIONS"),
+      Self::RADIO_PLAYING => Some("RADIO_PLAYING"),
+      Self::RADIO_SELECTION => Some("RADIO_SELECTION"),
+      Self::BT_PLAYING => Some("BT_PLAYING"),
+      Self::SNAPCAST_PLAYING => Some("SNAPCAST_PLAYING"),
+      _ => None,
+    }
+  }
 }
-
-const ENUM_MIN_PAGE: i8 = 0;
-const ENUM_MAX_PAGE: i8 = 7;
-
+impl std::fmt::Debug for Page {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    if let Some(name) = self.variant_name() {
+      f.write_str(name)
+    } else {
+      f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+    }
+  }
+}
 impl<'a> flatbuffers::Follow<'a> for Page {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    flatbuffers::read_scalar_at::<Self>(buf, loc)
-  }
-}
-
-impl flatbuffers::EndianScalar for Page {
-  #[inline]
-  fn to_little_endian(self) -> Self {
-    let n = i8::to_le(self as i8);
-    let p = &n as *const i8 as *const Page;
-    unsafe { *p }
-  }
-  #[inline]
-  fn from_little_endian(self) -> Self {
-    let n = i8::from_le(self as i8);
-    let p = &n as *const i8 as *const Page;
-    unsafe { *p }
+    let b = flatbuffers::read_scalar_at::<i8>(buf, loc);
+    Self(b)
   }
 }
 
@@ -120,72 +179,88 @@ impl flatbuffers::Push for Page {
     type Output = Page;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<Page>(dst, *self);
+        flatbuffers::emplace_scalar::<i8>(dst, self.0);
     }
 }
 
-#[allow(non_camel_case_types)]
-const ENUM_VALUES_PAGE:[Page; 8] = [
-  Page::INACTIVE,
-  Page::LOADING,
-  Page::MENU_SELECTION,
-  Page::OPTIONS,
-  Page::RADIO_PLAYING,
-  Page::RADIO_SELECTION,
-  Page::BT_PLAYING,
-  Page::SNAPCAST_PLAYING
-];
-
-#[allow(non_camel_case_types)]
-const ENUM_NAMES_PAGE:[&'static str; 8] = [
-    "INACTIVE",
-    "LOADING",
-    "MENU_SELECTION",
-    "OPTIONS",
-    "RADIO_PLAYING",
-    "RADIO_SELECTION",
-    "BT_PLAYING",
-    "SNAPCAST_PLAYING"
-];
-
-pub fn enum_name_page(e: Page) -> &'static str {
-  let index = e as i8;
-  ENUM_NAMES_PAGE[index as usize]
+impl flatbuffers::EndianScalar for Page {
+  #[inline]
+  fn to_little_endian(self) -> Self {
+    let b = i8::to_le(self.0);
+    Self(b)
+  }
+  #[inline]
+  #[allow(clippy::wrong_self_convention)]
+  fn from_little_endian(self) -> Self {
+    let b = i8::from_le(self.0);
+    Self(b)
+  }
 }
 
-#[allow(non_camel_case_types)]
-#[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum PlaybackSource {
-  RADIO = 0,
-  BLUETOOTH = 1,
-  SNAPCAST = 2,
-
+impl<'a> flatbuffers::Verifiable for Page {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    i8::run_verifier(v, pos)
+  }
 }
 
-const ENUM_MIN_PLAYBACK_SOURCE: u8 = 0;
-const ENUM_MAX_PLAYBACK_SOURCE: u8 = 2;
+impl flatbuffers::SimpleToVerifyInSlice for Page {}
+#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
+pub const ENUM_MIN_PLAYBACK_SOURCE: u8 = 0;
+#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
+pub const ENUM_MAX_PLAYBACK_SOURCE: u8 = 2;
+#[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
+#[allow(non_camel_case_types)]
+pub const ENUM_VALUES_PLAYBACK_SOURCE: [PlaybackSource; 3] = [
+  PlaybackSource::RADIO,
+  PlaybackSource::BLUETOOTH,
+  PlaybackSource::SNAPCAST,
+];
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct PlaybackSource(pub u8);
+#[allow(non_upper_case_globals)]
+impl PlaybackSource {
+  pub const RADIO: Self = Self(0);
+  pub const BLUETOOTH: Self = Self(1);
+  pub const SNAPCAST: Self = Self(2);
+
+  pub const ENUM_MIN: u8 = 0;
+  pub const ENUM_MAX: u8 = 2;
+  pub const ENUM_VALUES: &'static [Self] = &[
+    Self::RADIO,
+    Self::BLUETOOTH,
+    Self::SNAPCAST,
+  ];
+  /// Returns the variant's name or "" if unknown.
+  pub fn variant_name(self) -> Option<&'static str> {
+    match self {
+      Self::RADIO => Some("RADIO"),
+      Self::BLUETOOTH => Some("BLUETOOTH"),
+      Self::SNAPCAST => Some("SNAPCAST"),
+      _ => None,
+    }
+  }
+}
+impl std::fmt::Debug for PlaybackSource {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    if let Some(name) = self.variant_name() {
+      f.write_str(name)
+    } else {
+      f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+    }
+  }
+}
 impl<'a> flatbuffers::Follow<'a> for PlaybackSource {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    flatbuffers::read_scalar_at::<Self>(buf, loc)
-  }
-}
-
-impl flatbuffers::EndianScalar for PlaybackSource {
-  #[inline]
-  fn to_little_endian(self) -> Self {
-    let n = u8::to_le(self as u8);
-    let p = &n as *const u8 as *const PlaybackSource;
-    unsafe { *p }
-  }
-  #[inline]
-  fn from_little_endian(self) -> Self {
-    let n = u8::from_le(self as u8);
-    let p = &n as *const u8 as *const PlaybackSource;
-    unsafe { *p }
+    let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+    Self(b)
   }
 }
 
@@ -193,31 +268,37 @@ impl flatbuffers::Push for PlaybackSource {
     type Output = PlaybackSource;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<PlaybackSource>(dst, *self);
+        flatbuffers::emplace_scalar::<u8>(dst, self.0);
     }
 }
 
-#[allow(non_camel_case_types)]
-const ENUM_VALUES_PLAYBACK_SOURCE:[PlaybackSource; 3] = [
-  PlaybackSource::RADIO,
-  PlaybackSource::BLUETOOTH,
-  PlaybackSource::SNAPCAST
-];
-
-#[allow(non_camel_case_types)]
-const ENUM_NAMES_PLAYBACK_SOURCE:[&'static str; 3] = [
-    "RADIO",
-    "BLUETOOTH",
-    "SNAPCAST"
-];
-
-pub fn enum_name_playback_source(e: PlaybackSource) -> &'static str {
-  let index = e as u8;
-  ENUM_NAMES_PLAYBACK_SOURCE[index as usize]
+impl flatbuffers::EndianScalar for PlaybackSource {
+  #[inline]
+  fn to_little_endian(self) -> Self {
+    let b = u8::to_le(self.0);
+    Self(b)
+  }
+  #[inline]
+  #[allow(clippy::wrong_self_convention)]
+  fn from_little_endian(self) -> Self {
+    let b = u8::from_le(self.0);
+    Self(b)
+  }
 }
 
+impl<'a> flatbuffers::Verifiable for PlaybackSource {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    u8::run_verifier(v, pos)
+  }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for PlaybackSource {}
 pub enum AnalyticsMessageOffset {}
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 
 pub struct AnalyticsMessage<'a> {
   pub _tab: flatbuffers::Table<'a>,
@@ -227,18 +308,14 @@ impl<'a> flatbuffers::Follow<'a> for AnalyticsMessage<'a> {
     type Inner = AnalyticsMessage<'a>;
     #[inline]
     fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table { buf: buf, loc: loc },
-        }
+        Self { _tab: flatbuffers::Table { buf, loc } }
     }
 }
 
 impl<'a> AnalyticsMessage<'a> {
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        AnalyticsMessage {
-            _tab: table,
-        }
+        AnalyticsMessage { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
@@ -258,8 +335,8 @@ impl<'a> AnalyticsMessage<'a> {
     pub const VT_PAYLOAD: flatbuffers::VOffsetT = 10;
 
   #[inline]
-  pub fn origin(&self) -> Option<&'a str> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(AnalyticsMessage::VT_ORIGIN, None)
+  pub fn origin(&self) -> &'a str {
+    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(AnalyticsMessage::VT_ORIGIN, None).unwrap()
   }
   #[inline]
   pub fn timestamp(&self) -> u64 {
@@ -270,14 +347,15 @@ impl<'a> AnalyticsMessage<'a> {
     self._tab.get::<AnalyticsMessageType>(AnalyticsMessage::VT_PAYLOAD_TYPE, Some(AnalyticsMessageType::NONE)).unwrap()
   }
   #[inline]
-  pub fn payload(&self) -> Option<flatbuffers::Table<'a>> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(AnalyticsMessage::VT_PAYLOAD, None)
+  pub fn payload(&self) -> flatbuffers::Table<'a> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(AnalyticsMessage::VT_PAYLOAD, None).unwrap()
   }
   #[inline]
   #[allow(non_snake_case)]
   pub fn payload_as_page_change(&self) -> Option<PageChange<'a>> {
     if self.payload_type() == AnalyticsMessageType::PageChange {
-      self.payload().map(|u| PageChange::init_from_table(u))
+      let u = self.payload();
+      Some(PageChange::init_from_table(u))
     } else {
       None
     }
@@ -287,7 +365,8 @@ impl<'a> AnalyticsMessage<'a> {
   #[allow(non_snake_case)]
   pub fn payload_as_playback_change(&self) -> Option<PlaybackChange<'a>> {
     if self.payload_type() == AnalyticsMessageType::PlaybackChange {
-      self.payload().map(|u| PlaybackChange::init_from_table(u))
+      let u = self.payload();
+      Some(PlaybackChange::init_from_table(u))
     } else {
       None
     }
@@ -297,7 +376,8 @@ impl<'a> AnalyticsMessage<'a> {
   #[allow(non_snake_case)]
   pub fn payload_as_playback_song_change(&self) -> Option<PlaybackSongChange<'a>> {
     if self.payload_type() == AnalyticsMessageType::PlaybackSongChange {
-      self.payload().map(|u| PlaybackSongChange::init_from_table(u))
+      let u = self.payload();
+      Some(PlaybackSongChange::init_from_table(u))
     } else {
       None
     }
@@ -305,8 +385,29 @@ impl<'a> AnalyticsMessage<'a> {
 
 }
 
+impl flatbuffers::Verifiable for AnalyticsMessage<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .visit_field::<flatbuffers::ForwardsUOffset<&str>>(&"origin", Self::VT_ORIGIN, true)?
+     .visit_field::<u64>(&"timestamp", Self::VT_TIMESTAMP, false)?
+     .visit_union::<AnalyticsMessageType, _>(&"payload_type", Self::VT_PAYLOAD_TYPE, &"payload", Self::VT_PAYLOAD, true, |key, v, pos| {
+        match key {
+          AnalyticsMessageType::PageChange => v.verify_union_variant::<flatbuffers::ForwardsUOffset<PageChange>>("AnalyticsMessageType::PageChange", pos),
+          AnalyticsMessageType::PlaybackChange => v.verify_union_variant::<flatbuffers::ForwardsUOffset<PlaybackChange>>("AnalyticsMessageType::PlaybackChange", pos),
+          AnalyticsMessageType::PlaybackSongChange => v.verify_union_variant::<flatbuffers::ForwardsUOffset<PlaybackSongChange>>("AnalyticsMessageType::PlaybackSongChange", pos),
+          _ => Ok(()),
+        }
+     })?
+     .finish();
+    Ok(())
+  }
+}
 pub struct AnalyticsMessageArgs<'a> {
-    pub origin: Option<flatbuffers::WIPOffset<&'a  str>>,
+    pub origin: Option<flatbuffers::WIPOffset<&'a str>>,
     pub timestamp: u64,
     pub payload_type: AnalyticsMessageType,
     pub payload: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
@@ -315,10 +416,10 @@ impl<'a> Default for AnalyticsMessageArgs<'a> {
     #[inline]
     fn default() -> Self {
         AnalyticsMessageArgs {
-            origin: None,
+            origin: None, // required field
             timestamp: 0,
             payload_type: AnalyticsMessageType::NONE,
-            payload: None,
+            payload: None, // required field
         }
     }
 }
@@ -354,12 +455,50 @@ impl<'a: 'b, 'b> AnalyticsMessageBuilder<'a, 'b> {
   #[inline]
   pub fn finish(self) -> flatbuffers::WIPOffset<AnalyticsMessage<'a>> {
     let o = self.fbb_.end_table(self.start_);
+    self.fbb_.required(o, AnalyticsMessage::VT_ORIGIN,"origin");
+    self.fbb_.required(o, AnalyticsMessage::VT_PAYLOAD,"payload");
     flatbuffers::WIPOffset::new(o.value())
   }
 }
 
+impl std::fmt::Debug for AnalyticsMessage<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let mut ds = f.debug_struct("AnalyticsMessage");
+      ds.field("origin", &self.origin());
+      ds.field("timestamp", &self.timestamp());
+      ds.field("payload_type", &self.payload_type());
+      match self.payload_type() {
+        AnalyticsMessageType::PageChange => {
+          if let Some(x) = self.payload_as_page_change() {
+            ds.field("payload", &x)
+          } else {
+            ds.field("payload", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
+        AnalyticsMessageType::PlaybackChange => {
+          if let Some(x) = self.payload_as_playback_change() {
+            ds.field("payload", &x)
+          } else {
+            ds.field("payload", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
+        AnalyticsMessageType::PlaybackSongChange => {
+          if let Some(x) = self.payload_as_playback_song_change() {
+            ds.field("payload", &x)
+          } else {
+            ds.field("payload", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
+        _ => {
+          let x: Option<()> = None;
+          ds.field("payload", &x)
+        },
+      };
+      ds.finish()
+  }
+}
 pub enum PageChangeOffset {}
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 
 pub struct PageChange<'a> {
   pub _tab: flatbuffers::Table<'a>,
@@ -369,18 +508,14 @@ impl<'a> flatbuffers::Follow<'a> for PageChange<'a> {
     type Inner = PageChange<'a>;
     #[inline]
     fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table { buf: buf, loc: loc },
-        }
+        Self { _tab: flatbuffers::Table { buf, loc } }
     }
 }
 
 impl<'a> PageChange<'a> {
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        PageChange {
-            _tab: table,
-        }
+        PageChange { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
@@ -405,6 +540,19 @@ impl<'a> PageChange<'a> {
   }
 }
 
+impl flatbuffers::Verifiable for PageChange<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .visit_field::<Page>(&"origin", Self::VT_ORIGIN, false)?
+     .visit_field::<Page>(&"destination", Self::VT_DESTINATION, false)?
+     .finish();
+    Ok(())
+  }
+}
 pub struct PageChangeArgs {
     pub origin: Page,
     pub destination: Page,
@@ -446,8 +594,16 @@ impl<'a: 'b, 'b> PageChangeBuilder<'a, 'b> {
   }
 }
 
+impl std::fmt::Debug for PageChange<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let mut ds = f.debug_struct("PageChange");
+      ds.field("origin", &self.origin());
+      ds.field("destination", &self.destination());
+      ds.finish()
+  }
+}
 pub enum PlaybackChangeOffset {}
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 
 pub struct PlaybackChange<'a> {
   pub _tab: flatbuffers::Table<'a>,
@@ -457,18 +613,14 @@ impl<'a> flatbuffers::Follow<'a> for PlaybackChange<'a> {
     type Inner = PlaybackChange<'a>;
     #[inline]
     fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table { buf: buf, loc: loc },
-        }
+        Self { _tab: flatbuffers::Table { buf, loc } }
     }
 }
 
 impl<'a> PlaybackChange<'a> {
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        PlaybackChange {
-            _tab: table,
-        }
+        PlaybackChange { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
@@ -494,15 +646,29 @@ impl<'a> PlaybackChange<'a> {
     self._tab.get::<PlaybackSource>(PlaybackChange::VT_SOURCE, Some(PlaybackSource::RADIO)).unwrap()
   }
   #[inline]
-  pub fn name(&self) -> Option<&'a str> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(PlaybackChange::VT_NAME, None)
+  pub fn name(&self) -> &'a str {
+    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(PlaybackChange::VT_NAME, None).unwrap()
   }
 }
 
+impl flatbuffers::Verifiable for PlaybackChange<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .visit_field::<bool>(&"started", Self::VT_STARTED, false)?
+     .visit_field::<PlaybackSource>(&"source", Self::VT_SOURCE, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<&str>>(&"name", Self::VT_NAME, true)?
+     .finish();
+    Ok(())
+  }
+}
 pub struct PlaybackChangeArgs<'a> {
     pub started: bool,
     pub source: PlaybackSource,
-    pub name: Option<flatbuffers::WIPOffset<&'a  str>>,
+    pub name: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for PlaybackChangeArgs<'a> {
     #[inline]
@@ -510,7 +676,7 @@ impl<'a> Default for PlaybackChangeArgs<'a> {
         PlaybackChangeArgs {
             started: false,
             source: PlaybackSource::RADIO,
-            name: None,
+            name: None, // required field
         }
     }
 }
@@ -542,12 +708,22 @@ impl<'a: 'b, 'b> PlaybackChangeBuilder<'a, 'b> {
   #[inline]
   pub fn finish(self) -> flatbuffers::WIPOffset<PlaybackChange<'a>> {
     let o = self.fbb_.end_table(self.start_);
+    self.fbb_.required(o, PlaybackChange::VT_NAME,"name");
     flatbuffers::WIPOffset::new(o.value())
   }
 }
 
+impl std::fmt::Debug for PlaybackChange<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let mut ds = f.debug_struct("PlaybackChange");
+      ds.field("started", &self.started());
+      ds.field("source", &self.source());
+      ds.field("name", &self.name());
+      ds.finish()
+  }
+}
 pub enum PlaybackSongChangeOffset {}
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 
 pub struct PlaybackSongChange<'a> {
   pub _tab: flatbuffers::Table<'a>,
@@ -557,18 +733,14 @@ impl<'a> flatbuffers::Follow<'a> for PlaybackSongChange<'a> {
     type Inner = PlaybackSongChange<'a>;
     #[inline]
     fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table { buf: buf, loc: loc },
-        }
+        Self { _tab: flatbuffers::Table { buf, loc } }
     }
 }
 
 impl<'a> PlaybackSongChange<'a> {
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        PlaybackSongChange {
-            _tab: table,
-        }
+        PlaybackSongChange { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
@@ -588,8 +760,8 @@ impl<'a> PlaybackSongChange<'a> {
     pub const VT_ALBUM: flatbuffers::VOffsetT = 10;
 
   #[inline]
-  pub fn raw_meta(&self) -> Option<&'a str> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(PlaybackSongChange::VT_RAW_META, None)
+  pub fn raw_meta(&self) -> &'a str {
+    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(PlaybackSongChange::VT_RAW_META, None).unwrap()
   }
   #[inline]
   pub fn title(&self) -> Option<&'a str> {
@@ -605,17 +777,32 @@ impl<'a> PlaybackSongChange<'a> {
   }
 }
 
+impl flatbuffers::Verifiable for PlaybackSongChange<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .visit_field::<flatbuffers::ForwardsUOffset<&str>>(&"raw_meta", Self::VT_RAW_META, true)?
+     .visit_field::<flatbuffers::ForwardsUOffset<&str>>(&"title", Self::VT_TITLE, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<&str>>(&"artist", Self::VT_ARTIST, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<&str>>(&"album", Self::VT_ALBUM, false)?
+     .finish();
+    Ok(())
+  }
+}
 pub struct PlaybackSongChangeArgs<'a> {
-    pub raw_meta: Option<flatbuffers::WIPOffset<&'a  str>>,
-    pub title: Option<flatbuffers::WIPOffset<&'a  str>>,
-    pub artist: Option<flatbuffers::WIPOffset<&'a  str>>,
-    pub album: Option<flatbuffers::WIPOffset<&'a  str>>,
+    pub raw_meta: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub title: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub artist: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub album: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for PlaybackSongChangeArgs<'a> {
     #[inline]
     fn default() -> Self {
         PlaybackSongChangeArgs {
-            raw_meta: None,
+            raw_meta: None, // required field
             title: None,
             artist: None,
             album: None,
@@ -654,20 +841,93 @@ impl<'a: 'b, 'b> PlaybackSongChangeBuilder<'a, 'b> {
   #[inline]
   pub fn finish(self) -> flatbuffers::WIPOffset<PlaybackSongChange<'a>> {
     let o = self.fbb_.end_table(self.start_);
+    self.fbb_.required(o, PlaybackSongChange::VT_RAW_META,"raw_meta");
     flatbuffers::WIPOffset::new(o.value())
   }
 }
 
+impl std::fmt::Debug for PlaybackSongChange<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let mut ds = f.debug_struct("PlaybackSongChange");
+      ds.field("raw_meta", &self.raw_meta());
+      ds.field("title", &self.title());
+      ds.field("artist", &self.artist());
+      ds.field("album", &self.album());
+      ds.finish()
+  }
+}
 #[inline]
+#[deprecated(since="2.0.0", note="Deprecated in favor of `root_as...` methods.")]
 pub fn get_root_as_analytics_message<'a>(buf: &'a [u8]) -> AnalyticsMessage<'a> {
-  flatbuffers::get_root::<AnalyticsMessage<'a>>(buf)
+  unsafe { flatbuffers::root_unchecked::<AnalyticsMessage<'a>>(buf) }
 }
 
 #[inline]
+#[deprecated(since="2.0.0", note="Deprecated in favor of `root_as...` methods.")]
 pub fn get_size_prefixed_root_as_analytics_message<'a>(buf: &'a [u8]) -> AnalyticsMessage<'a> {
-  flatbuffers::get_size_prefixed_root::<AnalyticsMessage<'a>>(buf)
+  unsafe { flatbuffers::size_prefixed_root_unchecked::<AnalyticsMessage<'a>>(buf) }
 }
 
+#[inline]
+/// Verifies that a buffer of bytes contains a `AnalyticsMessage`
+/// and returns it.
+/// Note that verification is still experimental and may not
+/// catch every error, or be maximally performant. For the
+/// previous, unchecked, behavior use
+/// `root_as_analytics_message_unchecked`.
+pub fn root_as_analytics_message(buf: &[u8]) -> Result<AnalyticsMessage, flatbuffers::InvalidFlatbuffer> {
+  flatbuffers::root::<AnalyticsMessage>(buf)
+}
+#[inline]
+/// Verifies that a buffer of bytes contains a size prefixed
+/// `AnalyticsMessage` and returns it.
+/// Note that verification is still experimental and may not
+/// catch every error, or be maximally performant. For the
+/// previous, unchecked, behavior use
+/// `size_prefixed_root_as_analytics_message_unchecked`.
+pub fn size_prefixed_root_as_analytics_message(buf: &[u8]) -> Result<AnalyticsMessage, flatbuffers::InvalidFlatbuffer> {
+  flatbuffers::size_prefixed_root::<AnalyticsMessage>(buf)
+}
+#[inline]
+/// Verifies, with the given options, that a buffer of bytes
+/// contains a `AnalyticsMessage` and returns it.
+/// Note that verification is still experimental and may not
+/// catch every error, or be maximally performant. For the
+/// previous, unchecked, behavior use
+/// `root_as_analytics_message_unchecked`.
+pub fn root_as_analytics_message_with_opts<'b, 'o>(
+  opts: &'o flatbuffers::VerifierOptions,
+  buf: &'b [u8],
+) -> Result<AnalyticsMessage<'b>, flatbuffers::InvalidFlatbuffer> {
+  flatbuffers::root_with_opts::<AnalyticsMessage<'b>>(opts, buf)
+}
+#[inline]
+/// Verifies, with the given verifier options, that a buffer of
+/// bytes contains a size prefixed `AnalyticsMessage` and returns
+/// it. Note that verification is still experimental and may not
+/// catch every error, or be maximally performant. For the
+/// previous, unchecked, behavior use
+/// `root_as_analytics_message_unchecked`.
+pub fn size_prefixed_root_as_analytics_message_with_opts<'b, 'o>(
+  opts: &'o flatbuffers::VerifierOptions,
+  buf: &'b [u8],
+) -> Result<AnalyticsMessage<'b>, flatbuffers::InvalidFlatbuffer> {
+  flatbuffers::size_prefixed_root_with_opts::<AnalyticsMessage<'b>>(opts, buf)
+}
+#[inline]
+/// Assumes, without verification, that a buffer of bytes contains a AnalyticsMessage and returns it.
+/// # Safety
+/// Callers must trust the given bytes do indeed contain a valid `AnalyticsMessage`.
+pub unsafe fn root_as_analytics_message_unchecked(buf: &[u8]) -> AnalyticsMessage {
+  flatbuffers::root_unchecked::<AnalyticsMessage>(buf)
+}
+#[inline]
+/// Assumes, without verification, that a buffer of bytes contains a size prefixed AnalyticsMessage and returns it.
+/// # Safety
+/// Callers must trust the given bytes do indeed contain a valid size prefixed `AnalyticsMessage`.
+pub unsafe fn size_prefixed_root_as_analytics_message_unchecked(buf: &[u8]) -> AnalyticsMessage {
+  flatbuffers::size_prefixed_root_unchecked::<AnalyticsMessage>(buf)
+}
 #[inline]
 pub fn finish_analytics_message_buffer<'a, 'b>(
     fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
