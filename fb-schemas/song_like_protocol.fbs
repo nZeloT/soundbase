@@ -1,10 +1,9 @@
-union MesagePayload {
+union MessagePayload {
     Response, Request
 }
 table SongMessage {
     id          :ulong;
-    origin      :string;
-    payload     :MesagePayload;
+    payload    :MessagePayload (required);
 }
 
 
@@ -14,14 +13,25 @@ table Response {
 }
 
 enum SourceKind : ubyte { RADIO = 0, BLUETOOTH, SNAPCAST }
-table Request {
-    raw_metadata    :string;
-    source_kind     :SourceKind;
-    source_name     :string;
+enum RequestAction : ubyte { INFO = 0, FAV, UNFAV }
 
+table SongInfo {
+    raw_meta        :string (required);
     song_title      :string;
     song_artist     :string;
     song_album      :string;
+}
+
+table SongSourceInfo {
+    source_kind     :SourceKind;
+    source_name     :string (required);
+}
+
+table Request {
+    requesting_party:string (required);
+    action_kind     :RequestAction;
+    song_source_info:SongSourceInfo (required);
+    song_info       :SongInfo (required);
 }
 
 root_type SongMessage;

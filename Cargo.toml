@@ -7,9 +7,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
-warp = "0.3"
-bytes = "1.0"
-flatbuffers = "0.7"
+flatbuffers = "0.8.4"
 chrono = "0.4"
-sqlite = "0.26.0"
+tide = "0.16.0"
+async-std = { version = "1.8.0", features = ["attributes"]}
+serde = { version = "1.0", features = ["derive"]}
+r2d2 = "0.8.9"
+r2d2_sqlite = "0.18.0"
+rusqlite = { version = "0.25.1", features = ["bundled"]}

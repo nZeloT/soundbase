@@ -1,25 +1,38 @@
-use warp::{Filter, http::StatusCode};
-use bytes::{Buf};
-
+mod error;
+mod db;
 mod analytics;
+mod analytics_handler;
+mod analytics_protocol_generated;
+mod song_like;
+mod song_like_handler;
+mod song_like_protocol_generated;
 
-fn map_analytics_body(body: bytes::Bytes) -> StatusCode {
-    analytics::consume_analytics_message(body.chunk());
-    warp::http::StatusCode::ACCEPTED
-}
+#[async_std::main]
+async fn main() -> tide::Result<()> {
+
+    let db = db::setup_db().expect("Failed to create DB!");
+    let mut app = tide::with_state(db);
 
 
-#[tokio::main]
-async fn main() {
-    let hello = warp::get()
-        .and(warp::path("hello"))
-        .map(|| "Hello World from the Rust Soundbase");
+    app.at("/analytics").post(|mut req: tide::Request<r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>>| async move {
+        let body = req.body_bytes().await?;
+        let mut db = req.state().get()?;
+        let _ = analytics_handler::consume_analytics_message(&mut db, body);
+        Ok(tide::Response::new(tide::StatusCode::Accepted))
+    });
 
-    let analytics = warp::post()
-        .and(warp::path("analytics"))
-        .and(warp::body::content_length_limit(8096))
-        .and(warp::body::bytes())
-        .map(map_analytics_body);
+    app.at("/song_fav").post(|mut req: tide::Request<r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>>| async move {
+        let body = req.body_bytes().await?;
+        let mut db = req.state().get()?;
+        let response = song_like_handler::consume_like_message(&mut db, body);
 
-    warp::serve(hello.or(analytics)).run(([192, 168, 2, 101], 2222)).await;
+        match response {
+            Ok(r) => Ok(tide::Response::builder(tide::StatusCode::Ok).body(r).build()),
+            Err(e) => Ok(tide::Response::builder(e.http_code).body(e.msg).build())
+        }
+    });
+
+    app.listen("192.168.2.101:3333").await?;
+
+    Ok(())
 }

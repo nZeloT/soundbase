@@ -2,12 +2,12 @@ union AnalyticsMessageType { PageChange, PlaybackChange, PlaybackSongChange }
 
 
 table AnalyticsMessage {
-	origin      :string;
+	origin      :string (required);
 	timestamp   :ulong;
-	payload     :AnalyticsMessageType;
+	payload     :AnalyticsMessageType (required);
 }
 
-enum Page : byte { INACTIVE = 0, LOADING, MENU_SELECTION, OPTIONS, RADIO_PLAYING, RADIO_SELECTION, BT_PLAYING, SNAPCAST_PLAYING }
+enum Page : byte { INACTIVE = 0, MENU_SELECTION, OPTIONS, RADIO_PLAYING, RADIO_SELECTION, BT_PLAYING, SNAPCAST_PLAYING }
 
 table PageChange {
 	origin      :Page;
@@ -18,11 +18,11 @@ enum PlaybackSource : ubyte { RADIO = 0, BLUETOOTH, SNAPCAST }
 table PlaybackChange {
 	started :bool;
 	source  :PlaybackSource;
-	name    :string;
+	name    :string (required);
 }
 
 table PlaybackSongChange {
-    raw_meta    :string;
+    raw_meta    :string (required);
     title       :string;
     artist      :string;
     album       :string;
