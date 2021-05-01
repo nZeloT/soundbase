@@ -93,7 +93,7 @@ impl Song {
                 Err(error::SoundbaseError { http_code: tide::StatusCode::InternalServerError, msg: "Found Excluded Song!".to_string() })
             }
             None => {
-                let mut found_matches = mappings.iter().filter(|m| capture.get(m.matching_group as usize) != None);
+                let found_matches = mappings.iter().filter(|m| capture.get(m.matching_group as usize) != None);
                 for mapping in found_matches {
                     let m = capture.get(mapping.matching_group as usize).unwrap(); //is safe as all others have been filtered before
                     let value = m.as_str();
