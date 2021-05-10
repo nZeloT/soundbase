@@ -1,11 +1,9 @@
-use crate::song_like;
+use crate::error::{SoundbaseError, Result};
+use crate::song_db::{SongDB, FindUnique, Save};
+use crate::song_like::{SongState, SourceMetadataDissect, RawSong, SongSource, SongMetadata, SongFav};
 use crate::song_like_protocol_generated;
-use crate::error;
-use crate::error::SoundbaseError;
-use crate::db::SongDB;
 
-pub fn consume_like_message<DB>(db: &mut DB, dissects: &[song_like::SourceMetadataDissect], buffer: Vec<u8>) -> error::Result<Vec<u8>>
-    where DB: SongDB
+pub fn consume_like_message(db: &mut SongDB, dissects: &[SourceMetadataDissect], buffer: Vec<u8>) -> Result<Vec<u8>>
 {
     let msg = song_like_protocol_generated::root_as_song_message(buffer.as_slice())
         .expect("Expected SongMessage. Got something else!");
@@ -20,7 +18,7 @@ pub fn consume_like_message<DB>(db: &mut DB, dissects: &[song_like::SourceMetada
     build_response_message(msg.id(), resp_kind)
 }
 
-fn build_response_message(msg_id: u64, response: song_like_protocol_generated::ResponseKind) -> error::Result<Vec<u8>> {
+fn build_response_message(msg_id: u64, response: song_like_protocol_generated::ResponseKind) -> Result<Vec<u8>> {
     let mut fbb = flatbuffers::FlatBufferBuilder::new();
 
     let mut res_builder = song_like_protocol_generated::ResponseBuilder::new(&mut fbb);
@@ -38,15 +36,14 @@ fn build_response_message(msg_id: u64, response: song_like_protocol_generated::R
     Ok(fbb.finished_data().to_vec())
 }
 
-fn process_message<DB>(db: &mut DB, dissects: &[song_like::SourceMetadataDissect], request: &song_like_protocol_generated::Request) -> error::Result<song_like_protocol_generated::ResponseKind>
-    where DB: SongDB
+fn process_message(db: &mut SongDB, dissects: &[SourceMetadataDissect], request: &song_like_protocol_generated::Request) -> Result<song_like_protocol_generated::ResponseKind>
 {
     println!("from requesting party {:?}", request.requesting_party());
 
-    let mut song_info = song_like::Song::new(&request.song_info());
+    let mut song_info = RawSong::new(&request.song_info());
     let song_source_info = request.song_source_info();
-    let song_source = song_like::SongSource::new(&song_source_info, dissects);
-    let song_meta = song_like::SongMetadata {
+    let song_source = SongSource::new(&song_source_info, dissects);
+    let song_meta = SongMetadata {
         origin: request.requesting_party().to_string(),
         source: song_source,
     };
@@ -59,17 +56,44 @@ fn process_message<DB>(db: &mut DB, dissects: &[song_like::SourceMetadataDissect
         println!("\tDissected Metadata to => {:?}", song_info);
     }
 
+    let possible_song = db.find_unique(&song_info)?;
+
     let resp_kind = match request.action_kind() {
-        song_like_protocol_generated::RequestAction::INFO => db.get_state(&song_info),
-        song_like_protocol_generated::RequestAction::FAV => db.fav_song(&song_info, &song_meta),
-        song_like_protocol_generated::RequestAction::UNFAV => db.unfav_song(&song_info, &song_meta),
-        _ => Err(SoundbaseError { http_code: tide::StatusCode::InternalServerError, msg: "Unknown RequestAction received!".to_string() })
+        song_like_protocol_generated::RequestAction::INFO => {
+            match possible_song {
+                Some(song) => if song.is_faved { Ok(SongState::Faved) } else { Ok(SongState::NotFaved) },
+                None => Ok(SongState::NotFound)
+            }
+        },
+        song_like_protocol_generated::RequestAction::FAV => {
+            //load song
+            match possible_song {
+                Some(mut song) => db.fav_song(&mut song, &song_meta),
+                None => {
+                    //song does not yet exist, so create it
+                    let mut song = db.create_song_from_raw(&song_info)?;
+                    song.is_faved = true;
+                    db.save(&mut song)?;
+                    Ok(SongState::NowFaved)
+                }
+            }
+        },
+        song_like_protocol_generated::RequestAction::UNFAV => {
+            match possible_song {
+                Some(mut song) => db.unfav_song(&mut song, &song_meta),
+                None => {
+                    //cant unfav a unknown song, therefore yield an error here
+                    Err(SoundbaseError::new("Can't unfav unknown song!"))
+                }
+            }
+        },
+        _ => Err(SoundbaseError::new("Unknown RequestAction received!"))
     };
     match resp_kind {
         Ok(kind) => {
             println!("\tReturning song state => {:?}", kind);
             Ok(kind.into())
         },
-        Err(e) => Err(e)
+        Err(e) => Err(SoundbaseError::from(e))
     }
 }

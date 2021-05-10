@@ -1,10 +1,9 @@
-use crate::db::AnalyticsDB;
 use crate::analytics_protocol_generated;
 use crate::error;
 use crate::analytics;
 
 pub fn consume_analytics_message<DB>(db: &mut DB, buffer: Vec<u8>) -> error::Result<()>
-    where DB: AnalyticsDB
+    where DB: analytics::AnalyticsDB
 {
     let msg = analytics_protocol_generated::root_as_analytics_message(buffer.as_slice())
         .expect("Expected AnalyticsMessage. Got something different.");

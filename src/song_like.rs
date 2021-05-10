@@ -1,11 +1,11 @@
 use std::fmt::Formatter;
 use serde::{Serialize, Deserialize};
+use crate::error::{SoundbaseError, Result};
 use crate::song_like_protocol_generated;
-use crate::error;
-use crate::error::SoundbaseError;
+use crate::song_db::{Song, SongDB, Save, SongHistDB};
 
 #[derive(Debug)]
-pub struct Song {
+pub struct RawSong {
     pub title: String,
     pub artist: String,
     pub album: String,
@@ -55,12 +55,17 @@ pub struct SourceMetadataDissectMapping {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SourceMetadataDissectConfig {
-    pub sources: Vec<SourceMetadataDissect>
+    pub sources: Vec<SourceMetadataDissect>,
 }
 
-impl Song {
+pub trait SongFav {
+    fn fav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState>;
+    fn unfav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState>;
+}
+
+impl RawSong {
     pub fn new(s: &song_like_protocol_generated::SongInfo) -> Self {
-        Song {
+        RawSong {
             title: s.song_title().unwrap_or("").to_string(),
             artist: s.song_artist().unwrap_or("").to_string(),
             album: s.song_album().unwrap_or("").to_string(),
@@ -72,15 +77,15 @@ impl Song {
         self.title.is_empty() && self.artist.is_empty() && self.album.is_empty()
     }
 
-    pub fn dissect_raw_using_source_info(&mut self, source: &SongSource) -> error::Result<()> {
-        let dissect = source.dissect_info.ok_or(SoundbaseError{http_code:tide::StatusCode::InternalServerError, msg: "No Dissect Info. Skipping.".to_string()})?;
+    pub fn dissect_raw_using_source_info(&mut self, source: &SongSource) -> Result<()> {
+        let dissect = source.dissect_info.ok_or(SoundbaseError { http_code: tide::StatusCode::InternalServerError, msg: "No Dissect Info. Skipping.".to_string() })?;
         let rxp = &dissect.dissect_regexp;
         let regex = regex::Regex::new(rxp)?;
         let excludes = &dissect.exclude;
         let mappings = &dissect.mapping;
 
         let capture = regex.captures(&self.raw)
-            .ok_or_else(|| error::SoundbaseError { http_code: tide::StatusCode::InternalServerError, msg: "Didn't match capturing group for dissect!".to_string() })?;
+            .ok_or_else(|| SoundbaseError { http_code: tide::StatusCode::InternalServerError, msg: "Didn't match capturing group for dissect!".to_string() })?;
 
 
         let mut found_excludes = excludes.iter()
@@ -90,7 +95,7 @@ impl Song {
         match found_excludes.next() {
             Some(ex) => {
                 println!("\tExcluding song -> {:?} due to exclude -> {:?}", self, ex);
-                Err(error::SoundbaseError { http_code: tide::StatusCode::InternalServerError, msg: "Found Excluded Song!".to_string() })
+                Err(SoundbaseError { http_code: tide::StatusCode::InternalServerError, msg: "Found Excluded Song!".to_string() })
             }
             None => {
                 let found_matches = mappings.iter().filter(|m| capture.get(m.matching_group as usize) != None);
@@ -142,7 +147,34 @@ fn try_get_fitting_dissect<'a>(dissects: &'a [SourceMetadataDissect], kind: &'a 
     }
 }
 
-impl std::fmt::Display for Song {
+impl<'a> SongFav for SongDB<'a> {
+    fn fav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState> {
+        match song.is_faved {
+            false => {
+                song.is_faved = true;
+                self.save(song)?;
+                self.store_song_hist_entry(song, meta, true)?;
+                Ok(SongState::NowFaved)
+            }
+            true => Ok(SongState::Faved),
+        }
+    }
+
+    fn unfav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState> {
+        match song.is_faved {
+            false => { Ok(SongState::NotFaved) }
+            true => {
+                song.is_faved = false;
+                self.save(song)?;
+                self.store_song_hist_entry(song, meta, false)?;
+
+                Ok(SongState::NowNotFaved)
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for RawSong {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "raw: {:?}; title: {:?}; artist: {:?}; album: {:?}", self.raw, self.title, self.artist, self.album)
     }

@@ -1,5 +1,8 @@
 mod error;
 mod db;
+mod song_db;
+mod album_of_week;
+mod top20_of_week;
 mod analytics;
 mod analytics_handler;
 mod analytics_protocol_generated;
@@ -50,7 +53,8 @@ async fn main() -> tide::Result<()> {
 
         let payload = req.state();
         let mut db = payload.db_pool.get()?;
-        let response = song_like_handler::consume_like_message(&mut db, &payload.dissects.sources, body);
+        let mut song_db = song_db::SongDB::new(&mut db);
+        let response = song_like_handler::consume_like_message(&mut song_db, &payload.dissects.sources, body);
 
         match response {
             Ok(r) => Ok(tide::Response::builder(tide::StatusCode::Ok).body(r).build()),
@@ -66,6 +70,20 @@ async fn main() -> tide::Result<()> {
         println!("Received a Heartbeat request for song_fav.");
         println!();
         Ok(tide::Response::new(tide::StatusCode::Ok))
+    });
+
+    app.at("/fetch").get(|mut req: tide::Request<RequestPayload>| async move {
+        let payload = req.state();
+        let mut db = payload.db_pool.get()?;
+        let mut song_db = song_db::SongDB::new(&mut db);
+        let response = album_of_week::fetch_new_rockantenne_album_of_week(&mut song_db);
+        match response {
+            Ok(..) => Ok(tide::Response::builder(tide::StatusCode::Ok).build()),
+            Err(e) => {
+                println!("\tRssponding with Error => {:?}", e.msg);
+                Ok(tide::Response::builder(e.http_code).body(e.msg).build())
+            }
+        }
     });
 
     app.listen("192.168.2.101:3333").await?;
