@@ -70,12 +70,12 @@ pub struct Song {
 }
 
 impl Song {
-    pub fn new(name: String, spot_id: String, artist_id: u64) -> Self {
+    pub fn new(name: String, spot_id: String, artist: Artist) -> Self {
         Song {
             id: 0,
             name,
             spot_id,
-            artist_id,
+            artist_id: artist.id,
             album_id: None,
             is_faved: false,
         }
@@ -86,18 +86,21 @@ impl Song {
 pub struct AlbumOfTheWeek {
     id: u64,
     album_id: u64,
+    album_song_list_raw: String,
     source: String,
     source_comment: String,
-    source_date: chrono::Date<chrono::FixedOffset>,
+    source_date: chrono::DateTime<chrono::FixedOffset>,
 }
 
 impl AlbumOfTheWeek {
-    pub fn new(source: String, source_comment: String, source_date: chrono::Date<chrono::FixedOffset>, album: Album) -> Self {
+    //TODO: return Result and check whether album id is valid
+    pub fn new(source: String, source_comment: String, source_date: chrono::DateTime<chrono::FixedOffset>, album: Album, album_song_list_raw: String) -> Self {
         AlbumOfTheWeek {
             id: 0,
             source,
             source_comment,
             source_date,
+            album_song_list_raw,
             album_id: album.id
         }
     }
@@ -105,10 +108,38 @@ impl AlbumOfTheWeek {
 
 impl PartialEq for AlbumOfTheWeek {
     fn eq(&self, other: &Self) -> bool {
+        println!("Comparing two AofW...");
+        println!("\tsource => {:?} <=> {:?} => {:?}", self.source, other.source, self.source == other.source);
+        println!("\tdate => {:?} <=> {:?} => {:?}", self.source_date, other.source_date, self.source_date == other.source_date);
+        println!("\talbum => {:?} <=> {:?} => {:?}", self.album_id, other.album_id, self.album_id == other.album_id);
         self.source == other.source && self.source_date == other.source_date && self.album_id == other.album_id
     }
 }
 impl Eq for AlbumOfTheWeek {}
+
+#[derive(Debug)]
+pub struct TopOfTheWeekEntry {
+    id: u64,
+    pub week: u8,
+    pub year: u16,
+    pub source: String,
+    song_id: u64,
+    pub chart_position: u8
+}
+
+impl TopOfTheWeekEntry {
+    //TODO: return result and check whether song id is valid
+    pub fn new(year: u16, week: u8, source: String, position: u8, song: Song) -> Self {
+        TopOfTheWeekEntry {
+            id: 0,
+            year,
+            week,
+            source,
+            chart_position: position,
+            song_id: song.id
+        }
+    }
+}
 
 pub trait Load<R> {
     fn load(&mut self, id: u64) -> Result<R>;
@@ -272,7 +303,7 @@ impl<'a> Load<Song> for SongDB<'a> {
         if id == 0 {
             Err(SongDBError::new("Invalid ID given!"))
         }else {
-            let mut prep_stmt = self.db.prepare("SELECT song_title,song_spot_id,is_faved,_artist_id,album_id FROM songs WHERE song_id = ? LIMIT 1")?;
+            let mut prep_stmt = self.db.prepare("SELECT song_title,song_spot_id,is_faved,artist_id,album_id FROM songs WHERE song_id = ? LIMIT 1")?;
             let mut rows = prep_stmt.query([
                 id
             ])?;
@@ -298,20 +329,21 @@ impl<'a> Load<AlbumOfTheWeek> for SongDB<'a> {
         if id == 0 {
             Err(SongDBError::new("Invaild ID given!"))
         }else {
-            let mut stmt = self.db.prepare("SELECT album_id,source_name,source_comment,source_date FROM albums_of_week WHERE week_id = ? LIMIT 1")?;
+            let mut stmt = self.db.prepare("SELECT album_id,album_song_list_raw,source_name,source_comment,source_date FROM albums_of_week WHERE week_id = ? LIMIT 1")?;
             let mut rows = stmt.query(rusqlite::params![id])?;
 
             match rows.next()? {
                 Some(row) => {
-                    let tmstp : i64 = row.get(3)?;
-                    let d = chrono::DateTime::<chrono::FixedOffset>::from_utc(chrono::NaiveDateTime::from_timestamp(tmstp, 0), chrono::FixedOffset::west(0));
+                    let tmstp : String = row.get(4)?;
+                    let d = chrono::DateTime::<chrono::FixedOffset>::parse_from_rfc3339(&tmstp)?;
 
                     Ok(AlbumOfTheWeek{
                         id,
                         album_id: row.get(0)?,
-                        source: row.get(1)?,
-                        source_comment: row.get(2)?,
-                        source_date: d.date()
+                        album_song_list_raw: row.get(1)?,
+                        source: row.get(2)?,
+                        source_comment: row.get(3)?,
+                        source_date: d
                     })
                 },
                 None => Err(SongDBError::new("Didn't find the album of the week for the given week id!"))
@@ -397,12 +429,16 @@ impl<'a> FindSong<'a> {
         FindSong(name, artist, album)
     }
 }
-impl<'a> FindUnique<Song, FindSong<'a>> for SongDB<'a> {
-    fn find_unique(&mut self, query: &FindSong<'a>) -> Result<Option<Song>> {
+impl<'a, 'f> FindUnique<Song, FindSong<'f>> for SongDB<'a> {
+    fn find_unique(&mut self, query: &FindSong<'f>) -> Result<Option<Song>> {
         assert_ne!(query.1.id, 0);
         assert!(query.2.is_some() && query.2.unwrap().id != 0 || query.2.is_none());
 
-        let mut stmt = self.db.prepare("SELECT * FROM songs WHERE song_title = ? AND artist_id = ? AND album_id = ? LIMIT 1")?;
+        let mut q = "SELECT * FROM songs WHERE song_title = ? AND artist_id = ? AND album_id ".to_string();
+        q += if query.2.is_some() { "= ?" } else { "IS ?"};
+        q += " LIMIT 1";
+
+        let mut stmt = self.db.prepare(&q)?;
         let mut rows = stmt.query(rusqlite::params![query.0, query.1.id, query.2])?;
 
         match rows.next()? {
@@ -440,7 +476,7 @@ impl<'a> FindUnique<Song, RawSong> for SongDB<'a> {
                     let id: u64 = row.get(0)?;
                     id
                 }
-                None => return Err(SongDBError::new("Failed to find RawSong on DB."))
+                None => return Ok(None)
             }
         };
 
@@ -470,18 +506,21 @@ impl<'a> Query<AlbumOfTheWeek, AlbumOfTheWeekQuery> for SongDB<'a> {
         let mut rows = stmt.query(rusqlite::params![bounds.page_size, bounds.offset])?;
         let mut result = Vec::<AlbumOfTheWeek>::new();
         while let Some(row) = rows.next()? {
-            let tmstp = chrono::DateTime::<chrono::FixedOffset>::from_utc(chrono::NaiveDateTime::from_timestamp(row.get(4)?, 0), chrono::FixedOffset::west(0));
+            let dt_str :String = row.get(5)?;
+            let tmstp = chrono::DateTime::<chrono::FixedOffset>::parse_from_rfc3339(&dt_str)?;
             result.push(AlbumOfTheWeek{
                 id: row.get(0)?,
                 album_id: row.get(1)?,
-                source: row.get(2)?,
-                source_comment: row.get(3)?,
-                source_date: tmstp.date()
+                album_song_list_raw: row.get(2)?,
+                source: row.get(3)?,
+                source_comment: row.get(4)?,
+                source_date: tmstp
             });
         }
         Ok(result)
     }
 }
+
 
 impl<'a> Save<Artist> for SongDB<'a> {
     fn save(&mut self, to_save: &mut Artist) -> Result<()> {
@@ -573,17 +612,13 @@ impl<'a> Save<Song> for SongDB<'a> {
 impl<'a> Save<AlbumOfTheWeek> for SongDB<'a> {
     fn save(&mut self, to_save: &mut AlbumOfTheWeek) -> Result<()> {
         debug_assert!(to_save.album_id != 0);
-        let date_time = to_save.source_date.and_time(chrono::NaiveTime::from_hms(0, 0, 0));
-        let tmstp = match date_time {
-            Some(dt) => dt.timestamp(),
-            None => return Err(SongDBError::new("Failed to convert to timestamp!"))
-        };
+        let date_time = to_save.source_date.to_rfc3339();
 
         if to_save.id == 0 {
             //do insert
             let result: usize = {
-                let mut stmt = self.db.prepare("INSERT INTO albums_of_week (album_id,source_name,source_comment,source_date) VALUES(?,?,?,?)")?;
-                stmt.execute(rusqlite::params![to_save.album_id, to_save.source, to_save.source_comment, tmstp])?
+                let mut stmt = self.db.prepare("INSERT INTO albums_of_week (album_id,album_song_list_raw,source_name,source_comment,source_date) VALUES(?,?,?,?,?)")?;
+                stmt.execute(rusqlite::params![to_save.album_id, to_save.album_song_list_raw, to_save.source, to_save.source_comment, date_time])?
             };
             if result == 1 {
                 to_save.id = last_row_id(&mut self.db)?;
@@ -593,12 +628,42 @@ impl<'a> Save<AlbumOfTheWeek> for SongDB<'a> {
             }
         }else{
             //Do update
-            let mut stmt = self.db.prepare("UPDATE albums_of_week SET album_id = ?, source_name = ?, source_comment = ?, source_date = ? WHERE week_id = ?")?;
-            let result = stmt.execute(rusqlite::params![to_save.album_id, to_save.source, to_save.source_comment, tmstp, to_save.id])?;
+            let mut stmt = self.db.prepare("UPDATE albums_of_week SET album_id = ?, album_song_list_raw = ?, source_name = ?, source_comment = ?, source_date = ? WHERE week_id = ?")?;
+            let result = stmt.execute(rusqlite::params![to_save.album_id, to_save.album_song_list_raw, to_save.source, to_save.source_comment, date_time, to_save.id])?;
 
             if result != 1 {
                 Err(SongDBError::new("Failed to update the given album of week!"))
             }else {
+                Ok(())
+            }
+        }
+    }
+}
+
+impl<'a> Save<TopOfTheWeekEntry> for SongDB<'a> {
+    fn save(&mut self, to_save: &mut TopOfTheWeekEntry) -> Result<()> {
+        debug_assert!(to_save.song_id != 0);
+
+        if to_save.id == 0 {
+            //Do insert
+            let result: usize = {
+                let mut stmt = self.db.prepare("INSERT INTO top_charts_of_week (calendar_week,year,source_name,song_id,song_position) VALUES(?,?,?,?,?)")?;
+                stmt.execute(rusqlite::params![to_save.week, to_save.year, to_save.source, to_save.song_id, to_save.chart_position])?
+            };
+            if result == 1 {
+                to_save.id = last_row_id(&mut self.db)?;
+                Ok(())
+            }else{
+                Err(SongDBError::new("Failed to ceate new top chart of the week entry with given data!"))
+            }
+        }else {
+            //Do Update
+            let mut stmt = self.db.prepare("UPDATE top_charts_of_week SET calendar_week = ?, year = ?, source_name = ?, song_id = ?, song_position = ? WHERE week_song_id = ?")?;
+            let result = stmt.execute(rusqlite::params![to_save.week, to_save.year, to_save.source, to_save.song_id, to_save.chart_position, to_save.id])?;
+
+            if result != 1 {
+                Err(SongDBError::new("Failed to update top chart of week entry with given data!"))
+            }else{
                 Ok(())
             }
         }
@@ -676,6 +741,12 @@ impl From<rusqlite::Error> for SongDBError {
     fn from(e: rusqlite::Error) -> Self {
         let msg = format!("{:?}", e);
         SongDBError(msg)
+    }
+}
+
+impl From<chrono::ParseError> for SongDBError {
+    fn from(e: chrono::ParseError) -> Self {
+        SongDBError(e.to_string())
     }
 }
 

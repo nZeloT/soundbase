@@ -59,14 +59,16 @@ pub fn setup_db() -> error::Result<r2d2::Pool<r2d2_sqlite::SqliteConnectionManag
         CREATE TABLE IF NOT EXISTS albums_of_week (
             week_id         INTEGER PRIMARY KEY AUTOINCREMENT,
             album_id        INTEGER NOT NULL,
+            album_song_list_raw TEXT,
             source_name     VARCHAR(20) NOT NULL,
             source_comment  TEXT,
-            source_date     INTEGER,
+            source_date     VARCHAR(40),
             FOREIGN KEY(album_id) REFERENCES albums(album_id)
         );
         CREATE TABLE IF NOT EXISTS top_charts_of_week (
             week_song_id    INTEGER PRIMARY KEY AUTOINCREMENT,
-            source_date     INTEGER,
+            calendar_week   TINYINT,
+            year            TINYINT,
             source_name     VARCHAR(20) NOT NULL,
             song_id         INTEGER NOT NULL,
             song_position   TINYINT,

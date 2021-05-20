@@ -113,7 +113,7 @@ pub fn fetch_new_rockantenne_album_of_week(db: &mut SongDB<'_>) -> Result<()> {
 
     //8. write new album of week entry
     let new_aofw_date = chrono::DateTime::parse_from_rfc3339(&date_string)?;
-    let mut new_aofw = AlbumOfTheWeek::new("Rock Antenne".to_string(), reasoning_html, new_aofw_date.date(), db_album);
+    let mut new_aofw = AlbumOfTheWeek::new("Rock Antenne".to_string(), reasoning_html, new_aofw_date, db_album, song_list_html);
     match db.get_current_album_of_week()? {
         Some(aofw) => {
             //to prevent double entries of the same album first check for existence

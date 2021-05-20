@@ -59,7 +59,7 @@ async fn main() -> tide::Result<()> {
         match response {
             Ok(r) => Ok(tide::Response::builder(tide::StatusCode::Ok).body(r).build()),
             Err(e) => {
-                println!("\tRssponding with Error => {:?}", e.msg);
+                println!("\tResponding with Error => {:?}", e.msg);
                 Ok(tide::Response::builder(e.http_code).body(e.msg).build())
             }
         }
@@ -72,7 +72,7 @@ async fn main() -> tide::Result<()> {
         Ok(tide::Response::new(tide::StatusCode::Ok))
     });
 
-    app.at("/fetch").get(|mut req: tide::Request<RequestPayload>| async move {
+    app.at("/fetch/AlbumOfWeek").get(|req: tide::Request<RequestPayload>| async move {
         let payload = req.state();
         let mut db = payload.db_pool.get()?;
         let mut song_db = song_db::SongDB::new(&mut db);
@@ -80,13 +80,32 @@ async fn main() -> tide::Result<()> {
         match response {
             Ok(..) => Ok(tide::Response::builder(tide::StatusCode::Ok).build()),
             Err(e) => {
-                println!("\tRssponding with Error => {:?}", e.msg);
+                println!("\tResponding with Error => {:?}", e.msg);
                 Ok(tide::Response::builder(e.http_code).body(e.msg).build())
             }
         }
     });
 
-    app.listen("192.168.2.101:3333").await?;
+    app.at("/fetch/Top20OfWeek").get(|req: tide::Request<RequestPayload>| async move {
+       let payload = req.state();
+        let mut db = payload.db_pool.get()?;
+        let mut song_db = song_db::SongDB::new(&mut db);
+        let response = top20_of_week::fetch_new_rockantenne_top20_of_week(&mut song_db);
+        match response {
+            Ok(..) => Ok(tide::Response::builder(tide::StatusCode::Ok).build()),
+            Err(e) => {
+                println!("\tResponding with Error => {}", e.msg);
+                Ok(tide::Response::builder(e.http_code).body(e.msg).build())
+            }
+        }
+    });
+
+    let env_ip = match std::env::var("SERVER_IP") {
+        Ok(given_ip) => given_ip,
+        Err(_) => "192.168.2.111:3333".to_string()
+    };
+    println!("Soundbase listening on => {}", env_ip);
+    app.listen(env_ip).await?;
 
     Ok(())
 }

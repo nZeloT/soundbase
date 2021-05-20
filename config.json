@@ -6,11 +6,11 @@
       "dissect_regexp": "([A-Za-z0-9.() &]+) - ([A-Za-z0-9.() &]+)",
       "mapping" : [
         {
-          "matching_group": 1,
+          "matching_group": 2,
           "field": "title"
         },
         {
-          "matching_group": 2,
+          "matching_group": 1,
           "field": "artist"
         }
       ],

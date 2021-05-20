@@ -1,5 +1,5 @@
-use reqwest::Error;
-use chrono::ParseError;
+use std::string::FromUtf8Error;
+use std::num::ParseIntError;
 
 pub type Result<T, E = SoundbaseError> = core::result::Result<T, E>;
 
@@ -75,6 +75,24 @@ impl From<reqwest::Error> for SoundbaseError {
 impl From<chrono::ParseError> for SoundbaseError {
     fn from(e: chrono::ParseError) -> Self {
         SoundbaseError {
+            http_code: tide::StatusCode::InternalServerError,
+            msg: e.to_string()
+        }
+    }
+}
+
+impl From<FromUtf8Error> for SoundbaseError {
+    fn from(e: FromUtf8Error) -> Self {
+        SoundbaseError {
+            http_code: tide::StatusCode::InternalServerError,
+            msg: e.to_string()
+        }
+    }
+}
+
+impl From<ParseIntError> for SoundbaseError {
+    fn from(e: ParseIntError) -> Self {
+        SoundbaseError{
             http_code: tide::StatusCode::InternalServerError,
             msg: e.to_string()
         }
