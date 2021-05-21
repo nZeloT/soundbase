@@ -1,7 +1,7 @@
 use crate::error;
 
 pub fn setup_db() -> error::Result<r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>> {
-    let manager = r2d2_sqlite::SqliteConnectionManager::file("./soundbase_test.db");
+    let manager = r2d2_sqlite::SqliteConnectionManager::file("./soundbase.db");
     let pool = r2d2::Pool::new(manager)?;
     let conn = pool.get()?;
     conn.execute_batch("\
