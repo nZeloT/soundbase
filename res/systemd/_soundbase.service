@@ -1,0 +1,17 @@
+[Unit]
+Description=Soundbase Service
+After=multi-user.target
+
+[Service]
+User=pi
+Type=idle
+WorkingDirectory=/home/pi/soundbase/
+ExecStart=/home/pi/soundbase/target/release/soundbase
+
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+StartLimitInterval=100
+
+[Install]
+WantedBy=multi-user.target
