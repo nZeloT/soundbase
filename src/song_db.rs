@@ -732,7 +732,7 @@ impl From<SongDBError> for SoundbaseError {
     fn from(e: SongDBError) -> Self {
         SoundbaseError {
             msg: e.0.to_string(),
-            http_code: tide::http::StatusCode::InternalServerError,
+            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

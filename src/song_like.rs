@@ -78,14 +78,14 @@ impl RawSong {
     }
 
     pub fn dissect_raw_using_source_info(&mut self, source: &SongSource) -> Result<()> {
-        let dissect = source.dissect_info.ok_or(SoundbaseError { http_code: tide::StatusCode::InternalServerError, msg: "No Dissect Info. Skipping.".to_string() })?;
+        let dissect = source.dissect_info.ok_or(SoundbaseError { http_code: http::StatusCode::INTERNAL_SERVER_ERROR, msg: "No Dissect Info. Skipping.".to_string() })?;
         let rxp = &dissect.dissect_regexp;
         let regex = regex::Regex::new(rxp)?;
         let excludes = &dissect.exclude;
         let mappings = &dissect.mapping;
 
         let capture = regex.captures(&self.raw)
-            .ok_or_else(|| SoundbaseError { http_code: tide::StatusCode::InternalServerError, msg: "Didn't match capturing group for dissect!".to_string() })?;
+            .ok_or_else(|| SoundbaseError { http_code: http::StatusCode::INTERNAL_SERVER_ERROR, msg: "Didn't match capturing group for dissect!".to_string() })?;
 
 
         let mut found_excludes = excludes.iter()
@@ -95,7 +95,7 @@ impl RawSong {
         match found_excludes.next() {
             Some(ex) => {
                 println!("\tExcluding song -> {:?} due to exclude -> {:?}", self, ex);
-                Err(SoundbaseError { http_code: tide::StatusCode::InternalServerError, msg: "Found Excluded Song!".to_string() })
+                Err(SoundbaseError { http_code: http::StatusCode::INTERNAL_SERVER_ERROR, msg: "Found Excluded Song!".to_string() })
             }
             None => {
                 let found_matches = mappings.iter().filter(|m| capture.get(m.matching_group as usize) != None);

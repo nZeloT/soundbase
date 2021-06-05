@@ -213,7 +213,7 @@ fn get_selector(selector: &'static str) -> Result<scraper::Selector> {
         Ok(s) => Ok(s),
         Err(e) => {
             Err(SoundbaseError{
-                http_code: tide::StatusCode::InternalServerError,
+                http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
                 msg: format!("{:?}", e)
             })
         }
