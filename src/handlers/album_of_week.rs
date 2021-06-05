@@ -1,47 +1,10 @@
 use crate::error::{Result, SoundbaseError};
-use crate::song_db::{AlbumOfTheWeek, SongDB, Query, QueryBounds, QueryOrdering, OrderDirection, Save, Artist, FindUnique, FindArtist, FindAlbum, Album};
+use crate::db::{QueryBounds, QueryOrdering, OrderDirection, artist::*, album::*, album_of_week::AlbumOfTheWeek, album_of_week::AlbumsOfTheWeek, FindUnique, Save};
+use super::get_selector;
 
-pub trait AlbumsOfTheWeek {
-    fn get_current_album_of_week(&mut self) -> Result<Option<AlbumOfTheWeek>>;
-    fn get_albums_of_week(&mut self, offset: u8, limit: u8) -> Result<Vec<AlbumOfTheWeek>>;
-    fn store_new_album_of_week(&mut self, album: &mut AlbumOfTheWeek) -> Result<()>;
-}
-
-impl<'a> AlbumsOfTheWeek for SongDB<'a> {
-    fn get_current_album_of_week(&mut self) -> Result<Option<AlbumOfTheWeek>> {
-        let mut albums = self.query(
-            QueryBounds { offset: 0, page_size: 1 },
-            None,
-            Some(QueryOrdering{
-                direction: OrderDirection::Desc,
-                on_field: "source_date".to_string()
-            })
-        )?;
-        Ok(albums.pop())
-    }
-
-    fn get_albums_of_week(&mut self, offset: u8, limit: u8) -> Result<Vec<AlbumOfTheWeek>> {
-        let albums = self.query(
-            QueryBounds{
-                offset: offset as u64,
-                page_size: limit as u16
-            },
-            None,
-            Some(QueryOrdering{
-                direction: OrderDirection::Desc,
-                on_field: "source_date".to_string()
-            })
-        )?;
-        Ok(albums)
-    }
-
-    fn store_new_album_of_week(&mut self, album: &mut AlbumOfTheWeek) -> Result<()> {
-        self.save(album)?;
-        Ok(())
-    }
-}
-
-pub fn fetch_new_rockantenne_album_of_week(db: &mut SongDB<'_>) -> Result<()> {
+pub fn fetch_new_rockantenne_album_of_week<DB>(db: &mut DB) -> Result<()>
+    where DB: FindUnique<Artist, FindArtist> + FindUnique<Album, FindAlbum> + Save<Artist> + Save<Album> + Save<AlbumOfTheWeek> + AlbumsOfTheWeek
+{
     //1. fetch overview page
     let overview_body = reqwest::blocking::get("https://www.rockantenne.de/musik/album-der-woche/")?.text()?;
     let overview_body_parsed = scraper::Html::parse_document(&overview_body);
@@ -82,12 +45,11 @@ pub fn fetch_new_rockantenne_album_of_week(db: &mut SongDB<'_>) -> Result<()> {
     println!();
 
     //6. check for artist, if not write new
-    let artist_query = FindArtist::new(&artist);
-    let db_artist = match db.find_unique(&artist_query)? {
+    let db_artist = match db.find_unique(FindArtist::new(artist.clone()))? {
         Some(a) => {
             println!("Found existing Artist => {:?}", a);
             a
-        },
+        }
         None => {
             let mut a = Artist::new(artist, "".to_string());
             db.save(&mut a)?;
@@ -97,12 +59,11 @@ pub fn fetch_new_rockantenne_album_of_week(db: &mut SongDB<'_>) -> Result<()> {
     };
 
     //7. check for album if not write new
-    let album_query = FindAlbum::new(&album, &db_artist);
-    let db_album = match db.find_unique(&album_query)? {
+    let db_album = match db.find_unique(FindAlbum::new(album.clone(), &db_artist))? {
         Some(a) => {
             println!("Found existing Album => {:?}", a);
             a
-        },
+        }
         None => {
             let mut a = Album::new(album, "".to_string(), db_artist)?;
             db.save(&mut a)?;
@@ -118,9 +79,9 @@ pub fn fetch_new_rockantenne_album_of_week(db: &mut SongDB<'_>) -> Result<()> {
         Some(aofw) => {
             //to prevent double entries of the same album first check for existence
             if new_aofw == aofw {
-                return Err(SoundbaseError::new("Album of Week already found in DB. Skipping."))
+                return Err(SoundbaseError::new("Album of Week already found in DB. Skipping."));
             }
-        },
+        }
         None => {}
     };
 
@@ -138,7 +99,7 @@ fn select_artist(overview: &scraper::Html) -> Result<String> {
                 Some(text) => Ok(text.to_string()),
                 None => Err(SoundbaseError::new("No Text found in artist element selector!"))
             }
-        },
+        }
         None => Err(SoundbaseError::new("No Element found in artist element selector!"))
     }
 }
@@ -204,18 +165,5 @@ fn select_song_list(full_post: &scraper::Html) -> Result<String> {
     match possible_song_list {
         Some(song_list_el) => Ok(song_list_el.inner_html()),
         None => Err(SoundbaseError::new("No Element found in song list element selector!"))
-    }
-}
-
-fn get_selector(selector: &'static str) -> Result<scraper::Selector> {
-    let sel = scraper::Selector::parse(selector);
-    match sel {
-        Ok(s) => Ok(s),
-        Err(e) => {
-            Err(SoundbaseError{
-                http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-                msg: format!("{:?}", e)
-            })
-        }
     }
 }

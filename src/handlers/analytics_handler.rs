@@ -1,11 +1,12 @@
-use crate::analytics_protocol_generated;
-use crate::error;
-use crate::analytics;
+use crate::generated::analytics_protocol_generated as protocol;
+use crate::error::Result;
+use crate::model::analytics;
+use crate::db::analytics::AnalyticsDB;
 
-pub fn consume_analytics_message<DB>(db: &mut DB, buffer: Vec<u8>) -> error::Result<()>
-    where DB: analytics::AnalyticsDB
+pub fn consume_analytics_message<DB>(db: &mut DB, buffer: Vec<u8>) -> Result<()>
+    where DB: AnalyticsDB
 {
-    let msg = analytics_protocol_generated::root_as_analytics_message(buffer.as_slice())
+    let msg = protocol::root_as_analytics_message(buffer.as_slice())
         .expect("Expected AnalyticsMessage. Got something different.");
 
     let metadata = analytics::Metadata::new(&msg);

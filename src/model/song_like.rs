@@ -1,10 +1,9 @@
 use std::fmt::Formatter;
 use serde::{Serialize, Deserialize};
+use crate::generated::song_like_protocol_generated as protocol;
 use crate::error::{SoundbaseError, Result};
-use crate::song_like_protocol_generated;
-use crate::song_db::{Song, SongDB, Save, SongHistDB};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RawSong {
     pub title: String,
     pub artist: String,
@@ -58,13 +57,8 @@ pub struct SourceMetadataDissectConfig {
     pub sources: Vec<SourceMetadataDissect>,
 }
 
-pub trait SongFav {
-    fn fav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState>;
-    fn unfav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState>;
-}
-
 impl RawSong {
-    pub fn new(s: &song_like_protocol_generated::SongInfo) -> Self {
+    pub fn new(s: &protocol::SongInfo) -> Self {
         RawSong {
             title: s.song_title().unwrap_or("").to_string(),
             artist: s.song_artist().unwrap_or("").to_string(),
@@ -85,7 +79,7 @@ impl RawSong {
         let mappings = &dissect.mapping;
 
         let capture = regex.captures(&self.raw)
-            .ok_or_else(|| SoundbaseError { http_code: http::StatusCode::INTERNAL_SERVER_ERROR, msg: "Didn't match capturing group for dissect!".to_string() })?;
+            .ok_or_else(|| SoundbaseError::new("Didn't match capturing group for dissect!"))?;
 
 
         let mut found_excludes = excludes.iter()
@@ -95,7 +89,7 @@ impl RawSong {
         match found_excludes.next() {
             Some(ex) => {
                 println!("\tExcluding song -> {:?} due to exclude -> {:?}", self, ex);
-                Err(SoundbaseError { http_code: http::StatusCode::INTERNAL_SERVER_ERROR, msg: "Found Excluded Song!".to_string() })
+                Err(SoundbaseError::new("Found Excluded Song!"))
             }
             None => {
                 let found_matches = mappings.iter().filter(|m| capture.get(m.matching_group as usize) != None);
@@ -119,7 +113,7 @@ impl RawSong {
 }
 
 impl<'a> SongSource<'a> {
-    pub fn new(s: &'a song_like_protocol_generated::SongSourceInfo, dissects: &'a [SourceMetadataDissect]) -> Self {
+    pub fn new(s: &'a protocol::SongSourceInfo, dissects: &'a [SourceMetadataDissect]) -> Self {
         let kind = s.source_kind().variant_name().expect("Received unknown SourceKind!");
         let name = s.source_name();
         let dissect = try_get_fitting_dissect(dissects, kind, name);
@@ -147,32 +141,7 @@ fn try_get_fitting_dissect<'a>(dissects: &'a [SourceMetadataDissect], kind: &'a 
     }
 }
 
-impl<'a> SongFav for SongDB<'a> {
-    fn fav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState> {
-        match song.is_faved {
-            false => {
-                song.is_faved = true;
-                self.save(song)?;
-                self.store_song_hist_entry(song, meta, true)?;
-                Ok(SongState::NowFaved)
-            }
-            true => Ok(SongState::Faved),
-        }
-    }
 
-    fn unfav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState> {
-        match song.is_faved {
-            false => { Ok(SongState::NotFaved) }
-            true => {
-                song.is_faved = false;
-                self.save(song)?;
-                self.store_song_hist_entry(song, meta, false)?;
-
-                Ok(SongState::NowNotFaved)
-            }
-        }
-    }
-}
 
 impl std::fmt::Display for RawSong {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -186,14 +155,14 @@ impl std::fmt::Display for SongSource<'_> {
     }
 }
 
-impl Into<song_like_protocol_generated::ResponseKind> for SongState {
-    fn into(self) -> song_like_protocol_generated::ResponseKind {
+impl Into<protocol::ResponseKind> for SongState {
+    fn into(self) -> protocol::ResponseKind {
         match self {
-            SongState::NotFound => song_like_protocol_generated::ResponseKind::NOT_FOUND,
-            SongState::Faved => song_like_protocol_generated::ResponseKind::FOUND_FAVED,
-            SongState::NotFaved => song_like_protocol_generated::ResponseKind::FOUND_NOT_FAVED,
-            SongState::NowFaved => song_like_protocol_generated::ResponseKind::FOUND_NOW_FAVED,
-            SongState::NowNotFaved => song_like_protocol_generated::ResponseKind::FOUND_NOW_NOT_FAVED
+            SongState::NotFound => protocol::ResponseKind::NOT_FOUND,
+            SongState::Faved => protocol::ResponseKind::FOUND_FAVED,
+            SongState::NotFaved => protocol::ResponseKind::FOUND_NOT_FAVED,
+            SongState::NowFaved => protocol::ResponseKind::FOUND_NOW_FAVED,
+            SongState::NowNotFaved => protocol::ResponseKind::FOUND_NOW_NOT_FAVED
         }
     }
 }

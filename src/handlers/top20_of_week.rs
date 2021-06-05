@@ -1,14 +1,10 @@
-use crate::song_db::{TopOfTheWeekEntry, FindArtist, SongDB, FindUnique, Artist, Save, FindSong, Song};
 use std::process::{Command, Stdio};
-use crate::error::{Result, SoundbaseError};
 use regex::Regex;
 use chrono::Datelike;
 use std::io::Write;
-
-pub trait TopOfTheWeek {
-    fn get_current_top_of_week() -> Vec<TopOfTheWeekEntry>;
-    fn get_top_of_week(year: u16, week: u8) -> Vec<TopOfTheWeekEntry>;
-}
+use crate::error::{Result, SoundbaseError};
+use crate::db::{top_of_the_week::TopOfTheWeekEntry, Save, FindUnique, song::Song, song::FindSong, artist::*};
+use super::get_selector;
 
 #[derive(Debug)]
 struct Top20Entry {
@@ -17,7 +13,9 @@ struct Top20Entry {
     artist: String,
 }
 
-pub fn fetch_new_rockantenne_top20_of_week(db: &mut SongDB<'_>) -> Result<()> {
+pub fn fetch_new_rockantenne_top20_of_week<DB>(db: &mut DB) -> Result<()>
+    where DB: Save<TopOfTheWeekEntry> + FindUnique<Song, FindSong> + FindUnique<Artist, FindArtist> + Save<Artist> + Save<Song>
+{
     println!("Fetching the new top 20!");
 
     let top20page_body = reqwest::blocking::get("https://www.rockantenne.de/aktionen/top-20")?.text()?;
@@ -119,10 +117,11 @@ fn execute_tesseract(stdin: Vec<u8>) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
-fn store_entry_to_db(db: &mut SongDB<'_>, e : &Top20Entry, year: i32, week: u32) -> Result<()> {
+fn store_entry_to_db<DB>(db: &mut DB, e : &Top20Entry, year: i32, week: u32) -> Result<()>
+    where DB: FindUnique<Artist, FindArtist> + FindUnique<Song, FindSong> + Save<Artist> + Save<Song> + Save<TopOfTheWeekEntry>
+{
     //1. check whether the artist exists
-    let artist_query = FindArtist::new(&e.artist);
-    let db_artist = match db.find_unique(&artist_query)? {
+    let db_artist = match db.find_unique(FindArtist::new(e.artist.clone()))? {
         Some(a) => {
             println!("Found existing Artist => {:?}", a);
             a
@@ -135,8 +134,7 @@ fn store_entry_to_db(db: &mut SongDB<'_>, e : &Top20Entry, year: i32, week: u32)
     };
 
     //2. check whether the song exists
-    let find_song = FindSong::new(&e.title, &db_artist, None);
-    let db_song = match db.find_unique(&find_song)? {
+    let db_song = match db.find_unique(FindSong::new(e.title.clone(), &db_artist, None))? {
         Some(s) => {
             println!("Found existing song => {:?}", s);
             s
@@ -155,17 +153,4 @@ fn store_entry_to_db(db: &mut SongDB<'_>, e : &Top20Entry, year: i32, week: u32)
     db.save(&mut tow_entry)?;
     println!("Successfully stored.");
     Ok(())
-}
-
-fn get_selector(selector: &'static str) -> Result<scraper::Selector> {
-    let sel = scraper::Selector::parse(selector);
-    match sel {
-        Ok(s) => Ok(s),
-        Err(e) => {
-            Err(SoundbaseError{
-                http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-                msg: format!("{:?}", e)
-            })
-        }
-    }
 }

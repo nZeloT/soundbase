@@ -1,6 +1,56 @@
-use crate::error;
+pub mod db_error;
+pub mod analytics;
+pub mod artist;
+pub mod album;
+pub mod album_of_week;
+pub mod song;
+pub mod top_of_the_week;
+mod song_history;
+mod util;
 
-pub fn setup_db() -> error::Result<r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>> {
+type Result<R> = std::result::Result<R, db_error::DbError>;
+type DB    = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
+
+pub trait Load<R> {
+    fn load(&mut self, id: u64) -> Result<R>;
+}
+
+pub trait FollowForeignReference<O, D> {
+    fn follow_reference(&mut self, to_follow: &O) -> Result<D>;
+}
+
+pub trait FindUnique<R, Q> {
+    fn find_unique(&mut self, query: Q) -> Result<Option<R>>;
+}
+
+pub enum OrderDirection {
+    Asc,
+    Desc,
+}
+
+pub struct QueryOrdering {
+    pub direction: OrderDirection,
+    pub on_field: String
+}
+
+pub struct QueryBounds {
+    pub offset: u64,
+    pub page_size: u16,
+}
+
+pub trait Query<R, P> {
+    fn query(&mut self, bounds: QueryBounds, filter: Option<P>, ordering: Option<QueryOrdering>) -> Result<Vec<R>>;
+}
+
+pub trait Save<R> {
+    fn save(&mut self, to_save: &mut R) -> Result<()>;
+}
+
+pub trait Delete<R> {
+    fn delete(&mut self, to_delete: &R) -> Result<()>;
+}
+
+pub fn initialize_db() -> Result<r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>> {
     let manager = r2d2_sqlite::SqliteConnectionManager::file("./soundbase.db");
     let pool = r2d2::Pool::new(manager)?;
     let conn = pool.get()?;
