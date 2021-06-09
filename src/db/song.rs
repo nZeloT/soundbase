@@ -25,9 +25,13 @@ impl Song {
             is_faved: false,
         }
     }
+
+    pub fn has_album_info(&self) -> bool {
+        self.album_id != None
+    }
 }
 
-pub fn create_song_from_raw<'a, DB>(db: &mut DB, raw: &'a RawSong) -> Result<Song>
+pub fn create_song_from_raw<DB>(db: &mut DB, raw: &RawSong) -> Result<Song>
     where DB: FindUnique<Artist, FindArtist> + FindUnique<Album, FindAlbum> + Save<Artist> + Save<Album> + Save<Song>
 {
     let mut song = Song::default();

@@ -22,3 +22,4 @@ regex = "1.4.6"
 reqwest = { version = "0.11.3", features = ["blocking"]}
 scraper = "0.12.0"
 rspotify = "0.10.0"
+strsim = "0.10.0"

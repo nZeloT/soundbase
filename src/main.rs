@@ -38,12 +38,12 @@ async fn main() {
 
 mod filters {
     use std::sync::Arc;
-
+    use std::collections::HashMap;
     use warp::Filter;
 
     use crate::model::song_like::SourceMetadataDissect;
-
     use super::handlers;
+    use crate::model::spotify::Spotify;
 
     type DB = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
     type Dissects = Arc<Vec<super::model::song_like::SourceMetadataDissect>>;
@@ -105,11 +105,34 @@ mod filters {
             .and_then(handlers::fetch_album_of_week)
     }
 
+    pub fn spotify_start_authorization(
+        spotify: Spotify
+    ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
+        warp::path!("spotify" / "start_auth")
+            .and(warp::get())
+            .and(with_spotify(spotify))
+            .and_then(handlers::spotify_start_auth)
+    }
+
+    pub fn spotify_auth_callback(
+        spotify: Spotify
+    ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
+        warp::path!("auth_callback")
+            .and(warp::get())
+            .and(warp::query::<HashMap<String, String>>())
+            .and(with_spotify(spotify))
+            .and_then(handlers::spotify_auth_callback)
+    }
+
     fn with_db(db: DB) -> impl Filter<Extract=(DB, ), Error=std::convert::Infallible> + Clone {
         warp::any().map(move || db.clone())
     }
 
     fn with_dissects(dissects: Dissects) -> impl Filter<Extract=(Dissects, ), Error=std::convert::Infallible> + Clone {
         warp::any().map(move || dissects.clone())
+    }
+
+    fn with_spotify(spot: Spotify) -> impl Filter<Extract=(Spotify,), Error=std::convert::Infallible> + Clone {
+        warp::any().map(move || spot.clone())
     }
 }

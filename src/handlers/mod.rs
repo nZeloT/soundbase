@@ -1,14 +1,17 @@
 use std::sync::Arc;
-
+use std::collections::HashMap;
+use rspotify::oauth2::{SpotifyOAuth, SpotifyClientCredentials};
 use http::StatusCode;
 
 use crate::error::{Result, SoundbaseError};
 use crate::model::song_like::SourceMetadataDissect;
+use crate::model::spotify::{Spotify, SpotifyAuth};
 
 mod analytics_handler;
 mod song_like_handler;
 mod album_of_week;
 mod top20_of_week;
+mod spotify_handler;
 
 type DB = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 type Dissects = Arc<Vec<SourceMetadataDissect>>;
@@ -85,6 +88,15 @@ pub async fn fetch_album_of_week(db: DB) -> Result<impl warp::Reply, std::conver
         }
     }
 }
+
+pub async fn spotify_start_auth(wrapper: Spotify) -> Result<impl warp::Reply, std::convert::Infallible> {
+    Ok(reply(wrapper.auth.request_authorization_token(), http::StatusCode::OK))
+}
+
+pub async fn spotify_auth_callback(wrapper: Spotify, query: HashMap<String, String>) -> Result<impl warp::Reply, std::convert::Infallible> {
+    Ok(reply("TODO", http::StatusCode::NOT_FOUND))
+}
+
 
 fn reply<T : warp::Reply>(r: T, status: StatusCode) -> impl warp::Reply {
     warp::reply::with_status(r, status)
