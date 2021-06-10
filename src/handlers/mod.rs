@@ -1,11 +1,12 @@
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use std::collections::HashMap;
 use rspotify::oauth2::{SpotifyOAuth, SpotifyClientCredentials};
 use http::StatusCode;
 
 use crate::error::{Result, SoundbaseError};
 use crate::model::song_like::SourceMetadataDissect;
-use crate::model::spotify::{Spotify, SpotifyAuth};
+use crate::model::spotify::Spotify;
 
 mod analytics_handler;
 mod song_like_handler;
@@ -89,16 +90,35 @@ pub async fn fetch_album_of_week(db: DB) -> Result<impl warp::Reply, std::conver
     }
 }
 
-pub async fn spotify_start_auth(wrapper: Spotify) -> Result<impl warp::Reply, std::convert::Infallible> {
-    Ok(reply(wrapper.auth.request_authorization_token(), http::StatusCode::OK))
+pub async fn spotify_start_auth(wrapper: Arc<RwLock<Spotify>>) -> Result<impl warp::Reply, std::convert::Infallible> {
+    let spotify = wrapper.read().await;
+    let uri = spotify.request_authorization_token().await.clone();
+    Ok(reply(uri, http::StatusCode::OK))
 }
 
-pub async fn spotify_auth_callback(wrapper: Spotify, query: HashMap<String, String>) -> Result<impl warp::Reply, std::convert::Infallible> {
-    Ok(reply("TODO", http::StatusCode::NOT_FOUND))
+pub async fn spotify_auth_callback(mut wrapper: Arc<RwLock<Spotify>>, query: HashMap<String, String>) -> Result<impl warp::Reply, std::convert::Infallible> {
+    match query.get("code") {
+        Some(code) => {
+            let mut spotify = wrapper.write().await;
+            match spotify.finish_initialization_with_code(code.as_str()).await {
+                Ok(_) => {
+                    Ok(reply("Successful Authentication.".to_owned(), StatusCode::OK))
+                }
+                Err(e) => {
+                    println!("\tResponding with Error => {:?}", e);
+                    Ok(reply(e.msg, e.http_code))
+                }
+            }
+        }
+        None => {
+            println!("\tResponding with Error => No 'code' given as query parameter!");
+            Ok(reply("Couldn't find 'code' as query parameter!".to_owned(), StatusCode::BAD_REQUEST))
+        }
+    }
 }
 
 
-fn reply<T : warp::Reply>(r: T, status: StatusCode) -> impl warp::Reply {
+fn reply<T: warp::Reply>(r: T, status: StatusCode) -> impl warp::Reply {
     warp::reply::with_status(r, status)
 }
 
@@ -107,9 +127,9 @@ fn get_selector(selector: &'static str) -> Result<scraper::Selector> {
     match sel {
         Ok(s) => Ok(s),
         Err(e) => {
-            Err(SoundbaseError{
+            Err(SoundbaseError {
                 http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-                msg: format!("{:?}", e)
+                msg: format!("{:?}", e),
             })
         }
     }
