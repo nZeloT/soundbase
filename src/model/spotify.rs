@@ -74,7 +74,7 @@ impl Spotify {
             Ok(uri) => uri,
             Err(_) => "http://some.uri".to_string()
         };
-        let full_uri = redirect_uri + uri;
+        let full_uri = redirect_uri + "?" + uri;
         println!("URI => {}", full_uri);
         match self.client.redirected(full_uri.as_str(), self.state.as_str()).await {
             Ok(_) => {
