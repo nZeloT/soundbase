@@ -70,8 +70,13 @@ impl Spotify {
     }
 
     pub async fn finish_initialization_with_code(&mut self, uri: &str) -> error::Result<()> {
-        println!("URI => {}", uri);
-        match self.client.redirected(uri, self.state.as_str()).await {
+        let redirect_uri = match std::env::var("REDIRECT_URI") {
+            Ok(uri) => uri,
+            Err(_) => "http://some.uri".to_string()
+        };
+        let full_uri = redirect_uri + uri;
+        println!("URI => {}", full_uri);
+        match self.client.redirected(full_uri.as_str(), self.state.as_str()).await {
             Ok(_) => {
                 match self.client.refresh_token().await {
                     Some(token) => {
