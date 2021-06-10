@@ -1,4 +1,4 @@
-use super::{Result, DB, Load, Query, FindUnique, Save, Delete, db_error::DbError};
+use super::{Result, DB, Load, FindUnique, Save, Delete, db_error::DbError};
 use super::util::{last_row_id, delete};
 
 #[derive(Default, Debug)]

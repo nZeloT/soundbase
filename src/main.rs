@@ -8,12 +8,6 @@ pub mod db;
 pub mod handlers;
 pub mod generated;
 
-#[derive(Clone)]
-struct RequestPayload {
-    db_pool: r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>,
-    dissects: std::sync::Arc<model::song_like::SourceMetadataDissectConfig>,
-}
-
 #[tokio::main]
 async fn main() {
     let db = db::initialize_db().expect("Failed to create DB!");
@@ -23,11 +17,11 @@ async fn main() {
     println!("\t{:?}", metadata_dissect);
     println!();
 
-    let mut spotify = crate::model::spotify::Spotify::new();
+    let mut spotify = crate::model::spotify::Spotify::new().unwrap();
     match spotify.finish_initialization_from_cache().await {
         Ok(_) => println!("Spotify access enabled."),
         Err(e) =>
-            println!("Couldn't load spotif access token from cache (Error: {:?}). Consider authenticating by calling /spotify/start_auth.", e)
+            println!("Couldn't load spotify access token from cache (Error: {:?}). Consider authenticating by calling /spotify/start_auth.", e)
     }
 
     let api = filters::endpoints(db, Arc::new(metadata_dissect.sources), Arc::new(RwLock::new(spotify)));
@@ -47,10 +41,8 @@ async fn main() {
 mod filters {
     use std::sync::Arc;
     use tokio::sync::RwLock;
-    use std::collections::HashMap;
     use warp::Filter;
 
-    use crate::model::song_like::SourceMetadataDissect;
     use super::handlers;
     use crate::model::spotify::Spotify;
 
@@ -132,7 +124,7 @@ mod filters {
         warp::path!("spotify" / "auth_callback")
             .and(warp::get())
             .and(with_spotify(spotify))
-            .and(warp::query::<HashMap<String, String>>())
+            .and(warp::query::raw())
             .and_then(handlers::spotify_auth_callback)
     }
 

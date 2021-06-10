@@ -1,18 +1,14 @@
-use rspotify::senum::SearchType;
-use rspotify::senum::Country;
-use rspotify::model::search::SearchResult;
-use rspotify::model::page::Page;
-use rspotify::model::track::FullTrack;
+use aspotify::Scope;
+
 use crate::error;
 use crate::error::SoundbaseError;
 use crate::db::song::Song;
 use crate::db::FollowForeignReference;
 use crate::db::artist::Artist;
 use crate::db::album::Album;
-use crate::db::db_error::DbError;
 use crate::model::song_like::RawSong;
 
-const NECESSARY_SCOPES: &str = "user-library-read user-library-modify user-read-private";
+const NECESSARY_SCOPES: [Scope; 3] = [Scope::UserLibraryRead, Scope::UserFollowModify, Scope::UserReadPrivate];
 
 pub struct SpotifySong {
     track_id: String,
@@ -21,61 +17,100 @@ pub struct SpotifySong {
 
 #[derive(Debug)]
 pub struct Spotify {
-    oauth: rspotify::oauth2::SpotifyOAuth,
-    client: rspotify::client::Spotify,
+    state: String,
+    client: aspotify::Client,
     is_initialized: bool,
 }
 
 impl Spotify {
-    pub fn new() -> Self {
-        Spotify {
-            oauth: rspotify::oauth2::SpotifyOAuth::default().scope(NECESSARY_SCOPES).build(),
-            client: rspotify::client::Spotify::default(),
+    pub fn new() -> Result<Self, error::SoundbaseError> {
+        let creds = match aspotify::ClientCredentials::from_env() {
+            Ok(c) => c,
+            Err(e) => return Err(SoundbaseError {
+                msg: e.to_string(),
+                http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
+            })
+        };
+        Ok(Spotify {
+            state: String::new(),
+            client: aspotify::Client::new(creds),
             is_initialized: false,
-        }
+        })
     }
 
     pub async fn finish_initialization_from_cache(&mut self) -> error::Result<()> {
-        match self.oauth.get_cached_token().await {
-            Some(token) => {
-                let client_creds = rspotify::oauth2::SpotifyClientCredentials::default().token_info(token).build();
-                self.client = rspotify::client::Spotify::default().client_credentials_manager(client_creds).build();
-                self.is_initialized = true;
-                Ok(())
+        let refresh_token = match std::fs::read_to_string(".refresh_token") {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(SoundbaseError {
+                    msg: e.to_string(),
+                    http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
+                });
             }
-            None => Err(SoundbaseError::new("Failed to create token from cache! Needs manual authorization first."))
+        };
+
+        self.client.set_refresh_token(Some(refresh_token)).await;
+        self.is_initialized = true;
+        Ok(())
+    }
+
+    pub async fn request_authorization_token(&mut self) -> String {
+        let redirect_uri = match std::env::var("REDIRECT_URI") {
+            Ok(uri) => uri,
+            Err(_) => "http://some.uri".to_string()
+        };
+        let (url, state) = aspotify::authorization_url(
+            &self.client.credentials.id,
+            NECESSARY_SCOPES.iter().copied(),
+            false,
+            redirect_uri.as_str(),
+        );
+        self.state = state;
+        url
+    }
+
+    pub async fn finish_initialization_with_code(&mut self, uri: &str) -> error::Result<()> {
+        println!("URI => {}", uri);
+        match self.client.redirected(uri, self.state.as_str()).await {
+            Ok(_) => {
+                match self.client.refresh_token().await {
+                    Some(token) => {
+                        if let Err(e) = std::fs::write(".refresh_token", token) {
+                            Err(SoundbaseError {
+                                msg: e.to_string(),
+                                http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
+                            })
+                        } else {
+                            self.is_initialized = true;
+                            Ok(())
+                        }
+                    }
+                    None => {
+                        Err(SoundbaseError::new("Couldn't get spotify refresh token for storage!"))
+                    }
+                }
+            }
+            Err(e) => {
+                Err(SoundbaseError {
+                    msg: e.to_string(),
+                    http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
+                })
+            }
         }
     }
 
-    pub async fn request_authorization_token(&self) -> String {
-        let state = rspotify::util::generate_random_string(16);
-        self.oauth.get_authorize_url(Some(&state), None)
-    }
-
-    pub async fn finish_initialization_with_code(&mut self, code: &str) -> error::Result<()> {
-        match self.oauth.get_access_token(code).await {
-            Some(token) => {
-                let client_creds = rspotify::oauth2::SpotifyClientCredentials::default().token_info(token).build();
-                self.client = rspotify::client::Spotify::default().client_credentials_manager(client_creds).build();
-                self.is_initialized = true;
-                Ok(())
-            }
-            None => Err(SoundbaseError::new("Failed to create token from authorization code!"))
-        }
-    }
-
-    pub async fn publish_song_like<DB>(&self, mut db: DB, song: &Song)
+    pub async fn publish_song_like<DB>(&self, db: DB, song: &Song)
         where DB: FollowForeignReference<Song, Artist> + FollowForeignReference<Song, Album>
     {
         if !self.is_initialized {
             println!("Spotify connection not initialized. Call /spotify/start_auth to get authorization URL!");
-            return
+            return;
         }
 
         match self.find_song_in_spotify(db, song).await {
             Some(track_id) => {
                 let tracks = [track_id];
-                match self.client.current_user_saved_tracks_add(&tracks).await {
+                match self.client.library().save_tracks(tracks.iter().clone()).await {
                     Ok(()) => {}
                     Err(e) => {
                         println!("Failed to mark track as liked => {:?}", e)
@@ -88,18 +123,18 @@ impl Spotify {
         }
     }
 
-    pub async fn publish_song_dislike<DB>(&self, mut db: DB, song: &Song)
+    pub async fn publish_song_dislike<DB>(&self, db: DB, song: &Song)
         where DB: FollowForeignReference<Song, Artist> + FollowForeignReference<Song, Album>
     {
         if !self.is_initialized {
             println!("Spotify connection not initialized. Call /spotify/start_auth to get authorization URL!");
-            return
+            return;
         }
 
         match self.find_song_in_spotify(db, song).await {
             Some(track_id) => {
                 let tracks = [track_id];
-                match self.client.current_user_saved_tracks_delete(&tracks).await {
+                match self.client.library().unsave_tracks(tracks.iter().clone()).await {
                     Ok(()) => {}
                     Err(e) => {
                         println!("Failed to mark track as not liked => {:?}", e)
@@ -117,7 +152,7 @@ impl Spotify {
     {
         if !self.is_initialized {
             println!("Spotify connection not initialized. Call /spotify/start_auth to get authorization URL!");
-            return None
+            return None;
         }
 
         let song_title = song.name.as_str();
@@ -157,10 +192,19 @@ impl Spotify {
             _ => {}
         }
 
-        match self.client.search(query.as_str(), SearchType::Track, 10, 0, Some(Country::Germany), None).await {
+        let types = [aspotify::ItemType::Track];
+
+        match self.client.search().search(
+            query.as_str(),
+            types.iter().copied(),
+            false,
+            10,
+            0,
+            Some(aspotify::Market::FromToken)).await
+        {
             Ok(results) => {
-                match results {
-                    SearchResult::Tracks(tracks) => {
+                match results.data.tracks {
+                    Some(tracks) => {
                         let mut best_match = "".to_owned();
                         let mut best_score = 0.0;
                         for track in tracks.items {
@@ -177,7 +221,7 @@ impl Spotify {
                             println!("Calculated an avg score of {} for track {:?}", avg, track);
 
                             if avg > best_score {
-                                best_match = track.uri.clone();
+                                best_match = track.id.clone().unwrap();
                                 best_score = avg;
                                 println!("Found new best match with score {} for track {:?}", best_score, track);
                             }
@@ -191,7 +235,7 @@ impl Spotify {
                             None
                         }
                     }
-                    _ => {
+                    None => {
                         println!("Didn't get tracks back for a query on tracks!");
                         return None;
                     }
@@ -208,7 +252,7 @@ impl Spotify {
     {
         if !self.is_initialized {
             println!("Spotify connection not initialized. Call /spotify/start_auth to get authorization URL!");
-            return None
+            return None;
         }
 
         let album = if song.album.is_empty() { None } else { Some(song.album.clone()) };
@@ -216,20 +260,21 @@ impl Spotify {
             Some(trackid) => {
                 //check if its in the library
                 let tracks = [trackid.clone()];
-                match self.client.current_user_saved_tracks_contains(&tracks).await {
-                    Ok(contains) => {
+                match self.client.library().user_saved_tracks(tracks.iter().clone()).await {
+                    Ok(response) => {
+                        let contains = &response.data;
                         assert_eq!(contains.len(), 1);
                         Some(SpotifySong {
                             track_id: trackid.clone(),
                             in_library: contains[0],
                         })
-                    },
+                    }
                     Err(e) => {
                         println!("Failed to read current state of track {} in library! ({:?})", trackid, e);
                         None
                     }
                 }
-            },
+            }
             None => {
                 None
             }

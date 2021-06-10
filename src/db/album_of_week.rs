@@ -1,6 +1,6 @@
-use super::{Result, DB, Load, Query, QueryBounds, QueryOrdering, OrderDirection, FindUnique, Save, Delete, FollowForeignReference, db_error::DbError};
+use super::{Result, DB, Load, Query, QueryBounds, QueryOrdering, OrderDirection, Save, Delete, FollowForeignReference, db_error::DbError};
 use super::util::{last_row_id, delete};
-use super::album::{Album, FindAlbum};
+use super::album::Album;
 
 #[derive(Debug)]
 pub struct AlbumOfTheWeek {

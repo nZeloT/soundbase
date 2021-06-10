@@ -1,5 +1,4 @@
 use chrono::{Utc, DateTime, TimeZone};
-use crate::error;
 use crate::generated::analytics_protocol_generated as protocol;
 
 #[derive(Copy,Clone,Debug)]

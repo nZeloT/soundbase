@@ -1,7 +1,5 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::collections::HashMap;
-use rspotify::oauth2::{SpotifyOAuth, SpotifyClientCredentials};
 use http::StatusCode;
 
 use crate::error::{Result, SoundbaseError};
@@ -91,28 +89,20 @@ pub async fn fetch_album_of_week(db: DB) -> Result<impl warp::Reply, std::conver
 }
 
 pub async fn spotify_start_auth(wrapper: Arc<RwLock<Spotify>>) -> Result<impl warp::Reply, std::convert::Infallible> {
-    let spotify = wrapper.read().await;
+    let mut spotify = wrapper.write().await;
     let uri = spotify.request_authorization_token().await.clone();
     Ok(reply(uri, http::StatusCode::OK))
 }
 
-pub async fn spotify_auth_callback(mut wrapper: Arc<RwLock<Spotify>>, query: HashMap<String, String>) -> Result<impl warp::Reply, std::convert::Infallible> {
-    match query.get("code") {
-        Some(code) => {
-            let mut spotify = wrapper.write().await;
-            match spotify.finish_initialization_with_code(code.as_str()).await {
-                Ok(_) => {
-                    Ok(reply("Successful Authentication.".to_owned(), StatusCode::OK))
-                }
-                Err(e) => {
-                    println!("\tResponding with Error => {:?}", e);
-                    Ok(reply(e.msg, e.http_code))
-                }
-            }
+pub async fn spotify_auth_callback(wrapper: Arc<RwLock<Spotify>>, query: String) -> Result<impl warp::Reply, std::convert::Infallible> {
+    let mut spotify = wrapper.write().await;
+    match spotify.finish_initialization_with_code(query.as_str()).await {
+        Ok(_) => {
+            Ok(reply("Successful Authentication.".to_owned(), StatusCode::OK))
         }
-        None => {
-            println!("\tResponding with Error => No 'code' given as query parameter!");
-            Ok(reply("Couldn't find 'code' as query parameter!".to_owned(), StatusCode::BAD_REQUEST))
+        Err(e) => {
+            println!("\tResponding with Error => {:?}", e);
+            Ok(reply(e.msg, e.http_code))
         }
     }
 }

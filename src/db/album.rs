@@ -1,4 +1,4 @@
-use super::{Result, DB, Load, Query, FindUnique, Save, Delete, FollowForeignReference, db_error::DbError};
+use super::{Result, DB, Load, FindUnique, Save, Delete, FollowForeignReference, db_error::DbError};
 use super::util::{last_row_id, delete};
 use super::artist::Artist;
 use rusqlite::ToSql;

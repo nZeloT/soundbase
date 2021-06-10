@@ -1,5 +1,5 @@
 use crate::error::{Result, SoundbaseError};
-use crate::db::{QueryBounds, QueryOrdering, OrderDirection, artist::*, album::*, album_of_week::AlbumOfTheWeek, album_of_week::AlbumsOfTheWeek, FindUnique, Save};
+use crate::db::{QueryBounds, QueryOrdering, artist::*, album::*, album_of_week::AlbumOfTheWeek, album_of_week::AlbumsOfTheWeek, FindUnique, Save};
 use super::get_selector;
 
 pub fn fetch_new_rockantenne_album_of_week<DB>(db: &mut DB) -> Result<()>

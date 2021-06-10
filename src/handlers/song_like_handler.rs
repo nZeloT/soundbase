@@ -1,7 +1,7 @@
 use crate::error::{SoundbaseError, Result};
 use crate::model::song_like::{SongState, SourceMetadataDissect, RawSong, SongSource, SongMetadata};
 use crate::generated::song_like_protocol_generated as protocol;
-use crate::db::{song::SongFav, FindUnique, song::Song, song::create_song_from_raw, Save, album::*, artist::*, db_error::DbError};
+use crate::db::{song::SongFav, FindUnique, song::Song, song::create_song_from_raw, Save, album::*, artist::*};
 
 pub fn consume_like_message<'a, DB>(db: &mut DB, dissects: &[SourceMetadataDissect], buffer: Vec<u8>) -> Result<Vec<u8>>
     where DB: SongFav + FindUnique<Song, RawSong> + FindUnique<Artist, FindArtist> + FindUnique<Album, FindAlbum> + Save<Artist> + Save<Album> + Save<Song>
