@@ -4,7 +4,6 @@ use http::StatusCode;
 
 use crate::error::{Result, SoundbaseError};
 use crate::model::song_like::SourceMetadataDissect;
-use crate::model::spotify::Spotify;
 
 mod analytics_handler;
 mod song_like_handler;
@@ -14,6 +13,7 @@ mod spotify_handler;
 
 type DB = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 type Dissects = Arc<Vec<SourceMetadataDissect>>;
+type Spotify = Arc<RwLock<super::model::spotify::Spotify>>;
 
 pub async fn heartbeat() -> Result<impl warp::Reply, std::convert::Infallible> {
     println!("Received a Heartbeat request for analytics.");
@@ -33,21 +33,14 @@ pub async fn analytics_message(body: bytes::Bytes, db: DB) -> Result<impl warp::
     }
 }
 
-pub async fn song_fav(body: bytes::Bytes, db: DB, dissects: Dissects) -> Result<impl warp::Reply, std::convert::Infallible> {
-    match db.get() {
-        Ok(mut db_conn) => {
-            let resp = song_like_handler::consume_like_message(&mut db_conn, &dissects, body.to_vec());
+pub async fn song_fav(body: bytes::Bytes, spotify: Spotify, dissects: Dissects) -> Result<impl warp::Reply, std::convert::Infallible> {
+    let resp = song_like_handler::consume_like_message(spotify, &dissects, body.to_vec()).await;
 
-            match resp {
-                Ok(r) => Ok(reply(r, http::StatusCode::OK)),
-                Err(e) => {
-                    println!("\tResponding with Error => {:?}", e.msg);
-                    Ok(reply(e.msg.as_bytes().to_vec(), e.http_code))
-                }
-            }
-        }
+    match resp {
+        Ok(r) => Ok(reply(r, http::StatusCode::OK)),
         Err(e) => {
-            Ok(reply(e.to_string().as_bytes().to_vec(), http::StatusCode::INTERNAL_SERVER_ERROR))
+            println!("\tResponding with Error => {:?}", e.msg);
+            Ok(reply(e.msg.as_bytes().to_vec(), e.http_code))
         }
     }
 }
@@ -88,13 +81,13 @@ pub async fn fetch_album_of_week(db: DB) -> Result<impl warp::Reply, std::conver
     }
 }
 
-pub async fn spotify_start_auth(wrapper: Arc<RwLock<Spotify>>) -> Result<impl warp::Reply, std::convert::Infallible> {
+pub async fn spotify_start_auth(wrapper: Spotify) -> Result<impl warp::Reply, std::convert::Infallible> {
     let mut spotify = wrapper.write().await;
     let uri = spotify.request_authorization_token().await.clone();
     Ok(reply(uri, http::StatusCode::OK))
 }
 
-pub async fn spotify_auth_callback(wrapper: Arc<RwLock<Spotify>>, query: String) -> Result<impl warp::Reply, std::convert::Infallible> {
+pub async fn spotify_auth_callback(wrapper: Spotify, query: String) -> Result<impl warp::Reply, std::convert::Infallible> {
     let mut spotify = wrapper.write().await;
     match spotify.finish_initialization_with_code(query.as_str()).await {
         Ok(_) => {

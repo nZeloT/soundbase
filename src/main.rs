@@ -44,23 +44,23 @@ mod filters {
     use warp::Filter;
 
     use super::handlers;
-    use crate::model::spotify::Spotify;
 
     type DB = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
     type Dissects = Arc<Vec<super::model::song_like::SourceMetadataDissect>>;
+    type Spotify = Arc<RwLock<super::model::spotify::Spotify>>;
 
     pub fn endpoints(
         db: DB,
         dissects: Dissects,
-        spotify: Arc<RwLock<Spotify>>,
+        spotify: Spotify,
     ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
         heartbeat()
             .or(analytics_message(db.clone()))
-            .or(song_fav(db.clone(), dissects))
+            .or(song_fav( spotify.clone(), dissects))
             .or(fetch_tow(db.clone()))
             .or(fetch_aow(db))
             .or(spotify_start_authorization(spotify.clone()))
-            .or(spotify_auth_callback(spotify.clone()))
+            .or(spotify_auth_callback(spotify))
     }
 
     pub fn heartbeat() -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
@@ -80,13 +80,13 @@ mod filters {
     }
 
     pub fn song_fav(
-        db: DB,
+        spotify: Spotify,
         dissects: Dissects,
     ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
         warp::path!("song_fav")
             .and(warp::post())
             .and(warp::body::bytes())
-            .and(with_db(db))
+            .and(with_spotify(spotify))
             .and(with_dissects(dissects))
             .and_then(handlers::song_fav)
     }
@@ -110,7 +110,7 @@ mod filters {
     }
 
     pub fn spotify_start_authorization(
-        spotify: Arc<RwLock<Spotify>>
+        spotify: Spotify
     ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
         warp::path!("spotify" / "start_auth")
             .and(warp::get())
@@ -119,7 +119,7 @@ mod filters {
     }
 
     pub fn spotify_auth_callback(
-        spotify: Arc<RwLock<Spotify>>
+        spotify: Spotify
     ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
         warp::path!("spotify" / "auth_callback")
             .and(warp::get())
@@ -136,7 +136,7 @@ mod filters {
         warp::any().map(move || dissects.clone())
     }
 
-    fn with_spotify(spot: Arc<RwLock<Spotify>>) -> impl Filter<Extract=(Arc<RwLock<Spotify>>, ), Error=std::convert::Infallible> + Clone {
+    fn with_spotify(spot: Spotify) -> impl Filter<Extract=(Spotify, ), Error=std::convert::Infallible> + Clone {
         warp::any().map(move || spot.clone())
     }
 }

@@ -12,7 +12,7 @@ const NECESSARY_SCOPES: [Scope; 3] = [Scope::UserLibraryRead, Scope::UserFollowM
 
 pub struct SpotifySong {
     track_id: String,
-    in_library: bool,
+    pub in_library: bool,
 }
 
 #[derive(Debug)]
@@ -104,50 +104,34 @@ impl Spotify {
         }
     }
 
-    pub async fn publish_song_like<DB>(&self, db: DB, song: &Song)
-        where DB: FollowForeignReference<Song, Artist> + FollowForeignReference<Song, Album>
+    pub async fn publish_song_like(&self, song: &SpotifySong) -> error::Result<()>
     {
         if !self.is_initialized {
-            println!("Spotify connection not initialized. Call /spotify/start_auth to get authorization URL!");
-            return;
+            return Err(SoundbaseError::new("Spotify connection not initialized. Call /spotify/start_auth to get authorization URL!"));
         }
 
-        match self.find_song_in_spotify(db, song).await {
-            Some(track_id) => {
-                let tracks = [track_id];
-                match self.client.library().save_tracks(tracks.iter().clone()).await {
-                    Ok(()) => {}
-                    Err(e) => {
-                        println!("Failed to mark track as liked => {:?}", e)
-                    }
-                }
-            }
-            None => {
-                println!("Couldn't find spotify track for given song => {:?}", song)
+        let tracks = [song.track_id.as_str()];
+        match self.client.library().save_tracks(tracks.iter().clone()).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                println!("Failed to mark track as liked => {:?}", e);
+                Err(SoundbaseError::new("Failed to mark track as liked"))
             }
         }
     }
 
-    pub async fn publish_song_dislike<DB>(&self, db: DB, song: &Song)
-        where DB: FollowForeignReference<Song, Artist> + FollowForeignReference<Song, Album>
+    pub async fn publish_song_dislike(&self, song: &SpotifySong) -> error::Result<()>
     {
         if !self.is_initialized {
-            println!("Spotify connection not initialized. Call /spotify/start_auth to get authorization URL!");
-            return;
+            return Err(SoundbaseError::new("Spotify connection not initialized. Call /spotify/start_auth to get authorization URL!"));
         }
 
-        match self.find_song_in_spotify(db, song).await {
-            Some(track_id) => {
-                let tracks = [track_id];
-                match self.client.library().unsave_tracks(tracks.iter().clone()).await {
-                    Ok(()) => {}
-                    Err(e) => {
-                        println!("Failed to mark track as not liked => {:?}", e)
-                    }
-                }
-            }
-            None => {
-                println!("Couldn't find spotify track for given song => {:?}", song)
+        let tracks = [song.track_id.as_str()];
+        match self.client.library().unsave_tracks(tracks.iter().clone()).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                println!("Failed to mark track as not liked => {:?}", e);
+                Err(SoundbaseError::new("Failed to mark track as not liked"))
             }
         }
     }
