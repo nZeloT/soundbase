@@ -75,7 +75,7 @@ impl Spotify {
             Err(_) => "http://some.uri".to_string()
         };
         let full_uri = redirect_uri + "?" + uri;
-        println!("URI => {}", full_uri);
+        println!("\tURI => {}", full_uri);
         match self.client.redirected(full_uri.as_str(), self.state.as_str()).await {
             Ok(_) => {
                 match self.client.refresh_token().await {
@@ -114,7 +114,7 @@ impl Spotify {
         match self.client.library().save_tracks(tracks.iter().clone()).await {
             Ok(_) => Ok(()),
             Err(e) => {
-                println!("Failed to mark track as liked => {:?}", e);
+                println!("\tFailed to mark track as liked => {:?}", e);
                 Err(SoundbaseError::new("Failed to mark track as liked"))
             }
         }
@@ -130,7 +130,7 @@ impl Spotify {
         match self.client.library().unsave_tracks(tracks.iter().clone()).await {
             Ok(_) => Ok(()),
             Err(e) => {
-                println!("Failed to mark track as not liked => {:?}", e);
+                println!("\tFailed to mark track as not liked => {:?}", e);
                 Err(SoundbaseError::new("Failed to mark track as not liked"))
             }
         }
@@ -140,7 +140,7 @@ impl Spotify {
         where DB: FollowForeignReference<Song, Artist> + FollowForeignReference<Song, Album>
     {
         if !self.is_initialized {
-            println!("Spotify connection not initialized. Call /spotify/start_auth to get authorization URL!");
+            println!("\tSpotify connection not initialized. Call /spotify/start_auth to get authorization URL!");
             return None;
         }
 
@@ -158,7 +158,7 @@ impl Spotify {
             let album: Album = match db.follow_reference(song) {
                 Ok(album) => album,
                 Err(e) => {
-                    println!("Coulnt't read Album from DB! => {:?}", e);
+                    println!("\tCoulnt't read Album from DB! => {:?}", e);
                     return None;
                 }
             };
@@ -182,6 +182,8 @@ impl Spotify {
         }
 
         let types = [aspotify::ItemType::Track];
+
+        println!("\tSearching for tracks with query => {}", query);
 
         match self.client.search().search(
             query.as_str(),
@@ -207,31 +209,33 @@ impl Spotify {
 
                             let avg = (track_name_sim + track_album_sim + track_artist_sim) / 3.0;
 
-                            println!("Calculated an avg score of {} for track {:?}", avg, track);
+                            println!("\tCalculated an avg score of {} for track [{}] {} - {} ({})", avg, track.id.unwrap(), track_title, track_artist, track_album);
+                            println!("\t\tTitle {}; Artist {}; Album {}", track_name_sim, track_artist_sim, track_album_sim);
 
                             if avg > best_score {
                                 best_match = track.id.clone().unwrap();
                                 best_score = avg;
-                                println!("Found new best match with score {} for track {:?}", best_score, track);
+                                println!("\tFound new best match with score {} for track [{}] {} - {} ({})",
+                                         best_score, track.id.unwrap(), track_title, track_artist, track_album);
                             }
                         }
 
                         if best_score > 0.75 {
-                            println!("Found best match with score {} for track {}", best_score, best_match);
+                            println!("\tFound best match with score {} for track {}", best_score, best_match);
                             Some(best_match)
                         } else {
-                            println!("Didn't find a match close enough to the input; the best result scored {} for {}", best_score, best_match);
+                            println!("\tDidn't find a match close enough to the input; the best result scored {} for {}", best_score, best_match);
                             None
                         }
                     }
                     None => {
-                        println!("Didn't get tracks back for a query on tracks!");
+                        println!("\tDidn't get tracks back for a query on tracks!");
                         return None;
                     }
                 }
             }
             Err(e) => {
-                println!("Error while searching with the following query => {}; {:?}", query, e);
+                println!("\tError while searching with the following query => {}; {:?}", query, e);
                 return None;
             }
         }
@@ -240,7 +244,7 @@ impl Spotify {
     pub async fn find_song_in_library(&self, song: &RawSong) -> Option<SpotifySong>
     {
         if !self.is_initialized {
-            println!("Spotify connection not initialized. Call /spotify/start_auth to get authorization URL!");
+            println!("\tSpotify connection not initialized. Call /spotify/start_auth to get authorization URL!");
             return None;
         }
 
@@ -259,7 +263,7 @@ impl Spotify {
                         })
                     }
                     Err(e) => {
-                        println!("Failed to read current state of track {} in library! ({:?})", trackid, e);
+                        println!("\tFailed to read current state of track {} in library! ({:?})", trackid, e);
                         None
                     }
                 }

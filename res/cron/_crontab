@@ -1,0 +1,2 @@
+55 1 * * mon curl -s http://192.168.2.111:3333/fetch/AlbumOfWeek
+50 1 * * mon curl -s http://192.168.2.111:3333/fetch/Top20OfWeek
