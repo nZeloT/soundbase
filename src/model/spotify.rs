@@ -203,20 +203,21 @@ impl Spotify {
                             let track_album = track.album.name.as_str();
                             let track_artist = track.artists.iter().fold("".to_owned(), |list, a| list + " " + a.name.as_str());
 
-                            let track_name_sim = 1.0 - strsim::jaro_winkler(song_title, track_title);
-                            let track_album_sim = if album.is_some() { strsim::normalized_levenshtein(song_album.as_str(), track_album) } else { 1.0 };
-                            let track_artist_sim = strsim::sorensen_dice(song_artist, track_artist.as_str());
+                            let track_name_sim = strsim::jaro_winkler(song_title.to_uppercase().as_str(), track_title.to_uppercase().as_str());
+                            let track_album_sim =
+                                if album.is_some() { strsim::normalized_levenshtein(song_album.to_uppercase().as_str(), track_album.to_uppercase().as_str()) } else { 1.0 };
+                            let track_artist_sim = 1 - strsim::normalized_damerau_levenshtein(song_artist.to_uppercase().as_str(), track_artist.to_uppercase().as_str());
 
                             let avg = (track_name_sim + track_album_sim + track_artist_sim) / 3.0;
 
-                            println!("\tCalculated an avg score of {} for track [{}] {} - {} ({})", avg, track.id.unwrap(), track_title, track_artist, track_album);
+                            println!("\tCalculated an avg score of {} for track [{}] {} - {} ({})", avg, track.id.clone().unwrap(), track_title, track_artist, track_album);
                             println!("\t\tTitle {}; Artist {}; Album {}", track_name_sim, track_artist_sim, track_album_sim);
 
                             if avg > best_score {
                                 best_match = track.id.clone().unwrap();
                                 best_score = avg;
                                 println!("\tFound new best match with score {} for track [{}] {} - {} ({})",
-                                         best_score, track.id.unwrap(), track_title, track_artist, track_album);
+                                         best_score, track.id.clone().unwrap(), track_title, track_artist, track_album);
                             }
                         }
 
