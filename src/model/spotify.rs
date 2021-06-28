@@ -1,4 +1,6 @@
 use aspotify::Scope;
+use serde::{Serialize, Deserialize};
+use serde_json;
 
 use crate::error;
 use crate::error::SoundbaseError;
@@ -7,8 +9,25 @@ use crate::db::FollowForeignReference;
 use crate::db::artist::Artist;
 use crate::db::album::Album;
 use crate::model::song_like::RawSong;
+use std::time::{Instant, Duration};
+use std::error::Error;
 
-const NECESSARY_SCOPES: [Scope; 3] = [Scope::UserLibraryRead, Scope::UserFollowModify, Scope::UserReadPrivate];
+const NECESSARY_SCOPES: [Scope; 14] = [
+    Scope::UserLibraryRead,
+    Scope::UserLibraryModify,
+    Scope::UserFollowRead,
+    Scope::UserFollowModify,
+    Scope::UserReadEmail,
+    Scope::UserTopRead,
+    Scope::UserReadCurrentlyPlaying,
+    Scope::UserReadPlaybackState,
+    Scope::UgcImageUpload,
+    Scope::UserReadPrivate,
+    Scope::PlaylistModifyPrivate,
+    Scope::PlaylistModifyPublic,
+    Scope::PlaylistReadPrivate,
+    Scope::PlaylistReadCollaborative
+];
 
 pub struct SpotifySong {
     track_id: String,
@@ -18,8 +37,23 @@ pub struct SpotifySong {
 #[derive(Debug)]
 pub struct Spotify {
     state: String,
+    auth_url: String,
+    redirect_url: String,
     client: aspotify::Client,
     is_initialized: bool,
+}
+
+#[derive(Debug,Serialize)]
+#[serde(tag = "grant_type", rename = "refresh_token")]
+struct ForceTokenRefresh {
+    refresh_token: String
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct AccessToken {
+    access_token: String,
+    expires_in: u64,
+    refresh_token: Option<String>
 }
 
 impl Spotify {
@@ -31,8 +65,26 @@ impl Spotify {
                 http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
             })
         };
+
+        let redirect_uri = match std::env::var("REDIRECT_URI") {
+            Ok(uri) => uri,
+            Err(e) => return Err(SoundbaseError {
+                msg: e.to_string(),
+                http_code: http::StatusCode::INTERNAL_SERVER_ERROR
+            })
+        };
+
+        let (url, state) = aspotify::authorization_url(
+            &creds.id,
+            NECESSARY_SCOPES.iter().copied(),
+            false,
+            redirect_uri.as_str(),
+        );
+
         Ok(Spotify {
-            state: String::new(),
+            state,
+            redirect_url: redirect_uri,
+            auth_url: url,
             client: aspotify::Client::new(creds),
             is_initialized: false,
         })
@@ -54,27 +106,12 @@ impl Spotify {
         Ok(())
     }
 
-    pub async fn request_authorization_token(&mut self) -> String {
-        let redirect_uri = match std::env::var("REDIRECT_URI") {
-            Ok(uri) => uri,
-            Err(_) => "http://some.uri".to_string()
-        };
-        let (url, state) = aspotify::authorization_url(
-            &self.client.credentials.id,
-            NECESSARY_SCOPES.iter().copied(),
-            false,
-            redirect_uri.as_str(),
-        );
-        self.state = state;
-        url
+    pub async fn get_authorization_url(&self) -> String {
+        self.auth_url.clone()
     }
 
     pub async fn finish_initialization_with_code(&mut self, uri: &str) -> error::Result<()> {
-        let redirect_uri = match std::env::var("REDIRECT_URI") {
-            Ok(uri) => uri,
-            Err(_) => "http://some.uri".to_string()
-        };
-        let full_uri = redirect_uri + "?" + uri;
+        let full_uri = self.redirect_url.clone() + "?" + uri;
         println!("\tURI => {}", full_uri);
         match self.client.redirected(full_uri.as_str(), self.state.as_str()).await {
             Ok(_) => {
@@ -102,6 +139,53 @@ impl Spotify {
                 })
             }
         }
+    }
+
+    pub async fn force_token_update(&mut self) -> error::Result<()> {
+        if !self.is_initialized {
+            return Err(SoundbaseError::new("Tried to refresh token without being initialized!"))
+        }
+
+        //manually do a access token update
+        let token_request = ForceTokenRefresh {
+            refresh_token: self.get_refresh_token().await.unwrap()
+        };
+        let clnt = reqwest::Client::new();
+        let request = clnt.post("https://accounts.spotify.com/api/token")
+            .basic_auth(&self.client.credentials.id, Some(&self.client.credentials.secret))
+            .form(&token_request)
+            .build()?;
+        let response = clnt.execute(request).await?;
+        let status = response.status();
+        let body = response.text().await?;
+        if !status.is_success() {
+            return Err(SoundbaseError {
+                msg: format!("Authentication failed ({}). Response body is '{}'", status, body),
+                http_code: status
+            })
+        }
+
+        let new_token : AccessToken = serde_json::from_str(&body)?;
+        if let Some(ref refresh_token) = new_token.refresh_token {
+            if let Err(e) = std::fs::write(".refresh_token", refresh_token) {
+                return Err(SoundbaseError {
+                    msg: e.to_string(),
+                    http_code: http::StatusCode::INTERNAL_SERVER_ERROR
+                })
+            }
+        }
+
+        self.client.set_refresh_token(new_token.refresh_token).await;
+        self.client.set_current_access_token(new_token.access_token, Instant::now() + Duration::from_secs(new_token.expires_in)).await;
+        Ok(())
+    }
+
+    pub async fn get_current_access_token(&self) -> (String, Instant) {
+        self.client.current_access_token().await
+    }
+
+    pub async fn get_refresh_token(&self) -> Option<String> {
+        self.client.refresh_token().await
     }
 
     pub async fn publish_song_like(&self, song: &SpotifySong) -> error::Result<()>
@@ -201,12 +285,12 @@ impl Spotify {
                         for track in tracks.items {
                             let track_title = track.name.as_str();
                             let track_album = track.album.name.as_str();
-                            let track_artist = track.artists.iter().fold("".to_owned(), |list, a| list + " " + a.name.as_str());
+                            let track_artist = track.artists.iter().fold("".to_owned(), |list, a| list + " " + a.name.as_str()).trim().to_owned();
 
                             let track_name_sim = strsim::jaro_winkler(song_title.to_uppercase().as_str(), track_title.to_uppercase().as_str());
                             let track_album_sim =
                                 if album.is_some() { strsim::normalized_levenshtein(song_album.to_uppercase().as_str(), track_album.to_uppercase().as_str()) } else { 1.0 };
-                            let track_artist_sim = 1 - strsim::normalized_damerau_levenshtein(song_artist.to_uppercase().as_str(), track_artist.to_uppercase().as_str());
+                            let track_artist_sim = strsim::normalized_damerau_levenshtein(song_artist.to_uppercase().as_str(), track_artist.to_uppercase().as_str());
 
                             let avg = (track_name_sim + track_album_sim + track_artist_sim) / 3.0;
 
@@ -248,6 +332,8 @@ impl Spotify {
             println!("\tSpotify connection not initialized. Call /spotify/start_auth to get authorization URL!");
             return None;
         }
+
+        println!("\tTrying to find song {:?} in spotify library.", song);
 
         let album = if song.album.is_empty() { None } else { Some(song.album.clone()) };
         match self.find_song(song.title.as_str(), song.artist.as_str(), album).await {

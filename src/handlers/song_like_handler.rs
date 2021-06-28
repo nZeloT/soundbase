@@ -1,10 +1,10 @@
 use crate::error::{SoundbaseError, Result};
-use crate::model::song_like::{SongState, SourceMetadataDissect, RawSong, SongSource, SongMetadata};
+use crate::model::song_like::{SongState, SourceMetadataDetermination, RawSong, SongSource, SongMetadata};
 use crate::generated::song_like_protocol_generated as protocol;
 
 type Spotify = std::sync::Arc<tokio::sync::RwLock<crate::model::spotify::Spotify>>;
 
-pub async fn consume_like_message<'a>(spotify: Spotify, dissects: &[SourceMetadataDissect], buffer: Vec<u8>) -> Result<Vec<u8>>
+pub async fn consume_like_message<'a>(spotify: Spotify, dissects: &[SourceMetadataDetermination], buffer: Vec<u8>) -> Result<Vec<u8>>
 {
     let msg = protocol::root_as_song_message(buffer.as_slice())
         .expect("Expected SongMessage. Got something else!");
@@ -37,7 +37,7 @@ fn build_response_message(msg_id: u64, response: protocol::ResponseKind) -> Resu
     Ok(fbb.finished_data().to_vec())
 }
 
-async fn process_message<'a>(spotify: Spotify, dissects: &[SourceMetadataDissect], request: &'_ protocol::Request<'_>) -> Result<protocol::ResponseKind>
+async fn process_message<'a>(spotify: Spotify, dissects: &[SourceMetadataDetermination], request: &'_ protocol::Request<'_>) -> Result<protocol::ResponseKind>
 {
     println!("from requesting party {:?}", request.requesting_party());
 
