@@ -1,5 +1,4 @@
 pub mod db_error;
-pub mod analytics;
 pub mod artist;
 pub mod album;
 pub mod album_of_week;
@@ -55,20 +54,6 @@ pub fn initialize_db() -> Result<r2d2::Pool<r2d2_sqlite::SqliteConnectionManager
     let pool = r2d2::Pool::new(manager)?;
     let conn = pool.get()?;
     conn.execute_batch("\
-         CREATE TABLE IF NOT EXISTS analytics (
-            tmstp   INTEGER PRIMARY KEY,
-            origin  VARCHAR(20) NOT NULL,
-            kind    TINYINT,
-            transition_src  TINYINT,
-            transition_dst  TINYINT,
-            playback_source TINYINT,
-            playback_name   VARCHAR(25),
-            playback_started BOOLEAN,
-            song_raw        VARCHAR(60),
-            song_title      VARCHAR(20),
-            song_artist     VARCHAR(20),
-            song_album      VARCHAR(20)
-        );
         CREATE TABLE IF NOT EXISTS artists (
             artist_id       INTEGER PRIMARY KEY AUTOINCREMENT,
             artist_name     VARCHAR(30) NOT NULL,

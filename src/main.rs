@@ -54,9 +54,7 @@ mod filters {
         dissects: Dissects,
         spotify: Spotify,
     ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        analytics_heartbeat()
-            .or(song_fav_heartbeat())
-            .or(analytics_message(db.clone()))
+        song_fav_heartbeat()
             .or(song_fav( spotify.clone(), dissects))
             .or(fetch_tow(db.clone()))
             .or(fetch_aow(db))
@@ -64,26 +62,10 @@ mod filters {
             .or(spotify_auth_callback(spotify))
     }
 
-    pub fn analytics_heartbeat() -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("analytics" / "heartbeat")
-            .and(warp::get())
-            .and_then(handlers::heartbeat)
-    }
-
     pub fn song_fav_heartbeat() -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
         warp::path!("song_fav" / "heartbeat")
             .and(warp::get())
             .and_then(handlers::heartbeat)
-    }
-
-    pub fn analytics_message(
-        db: DB
-    ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("analytics")
-            .and(warp::post())
-            .and(warp::body::bytes())
-            .and(with_db(db))
-            .and_then(handlers::analytics_message)
     }
 
     pub fn song_fav(

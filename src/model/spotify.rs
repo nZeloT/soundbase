@@ -1,32 +1,21 @@
+use std::error::Error;
+use std::time::{Duration, Instant};
+
 use aspotify::Scope;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 
+use crate::db::album::Album;
+use crate::db::artist::Artist;
+use crate::db::FollowForeignReference;
+use crate::db::song::Song;
 use crate::error;
 use crate::error::SoundbaseError;
-use crate::db::song::Song;
-use crate::db::FollowForeignReference;
-use crate::db::artist::Artist;
-use crate::db::album::Album;
 use crate::model::song_like::RawSong;
-use std::time::{Instant, Duration};
-use std::error::Error;
 
-const NECESSARY_SCOPES: [Scope; 14] = [
+const NECESSARY_SCOPES: [Scope; 2] = [
     Scope::UserLibraryRead,
     Scope::UserLibraryModify,
-    Scope::UserFollowRead,
-    Scope::UserFollowModify,
-    Scope::UserReadEmail,
-    Scope::UserTopRead,
-    Scope::UserReadCurrentlyPlaying,
-    Scope::UserReadPlaybackState,
-    Scope::UgcImageUpload,
-    Scope::UserReadPrivate,
-    Scope::PlaylistModifyPrivate,
-    Scope::PlaylistModifyPublic,
-    Scope::PlaylistReadPrivate,
-    Scope::PlaylistReadCollaborative
 ];
 
 pub struct SpotifySong {
@@ -139,53 +128,6 @@ impl Spotify {
                 })
             }
         }
-    }
-
-    pub async fn force_token_update(&mut self) -> error::Result<()> {
-        if !self.is_initialized {
-            return Err(SoundbaseError::new("Tried to refresh token without being initialized!"))
-        }
-
-        //manually do a access token update
-        let token_request = ForceTokenRefresh {
-            refresh_token: self.get_refresh_token().await.unwrap()
-        };
-        let clnt = reqwest::Client::new();
-        let request = clnt.post("https://accounts.spotify.com/api/token")
-            .basic_auth(&self.client.credentials.id, Some(&self.client.credentials.secret))
-            .form(&token_request)
-            .build()?;
-        let response = clnt.execute(request).await?;
-        let status = response.status();
-        let body = response.text().await?;
-        if !status.is_success() {
-            return Err(SoundbaseError {
-                msg: format!("Authentication failed ({}). Response body is '{}'", status, body),
-                http_code: status
-            })
-        }
-
-        let new_token : AccessToken = serde_json::from_str(&body)?;
-        if let Some(ref refresh_token) = new_token.refresh_token {
-            if let Err(e) = std::fs::write(".refresh_token", refresh_token) {
-                return Err(SoundbaseError {
-                    msg: e.to_string(),
-                    http_code: http::StatusCode::INTERNAL_SERVER_ERROR
-                })
-            }
-        }
-
-        self.client.set_refresh_token(new_token.refresh_token).await;
-        self.client.set_current_access_token(new_token.access_token, Instant::now() + Duration::from_secs(new_token.expires_in)).await;
-        Ok(())
-    }
-
-    pub async fn get_current_access_token(&self) -> (String, Instant) {
-        self.client.current_access_token().await
-    }
-
-    pub async fn get_refresh_token(&self) -> Option<String> {
-        self.client.refresh_token().await
     }
 
     pub async fn publish_song_like(&self, song: &SpotifySong) -> error::Result<()>

@@ -23,3 +23,4 @@ reqwest = { version = "0.11", features = ["blocking"]}
 scraper = "0.12"
 strsim = "0.10"
 aspotify = "0.7"
+url = "2.2"
