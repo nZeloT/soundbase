@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+use std::path::Path;
+
 pub mod db_error;
 pub mod artist;
 pub mod album;
@@ -65,8 +67,8 @@ pub trait Delete<R> {
     fn delete(&mut self, to_delete: &R) -> Result<()>;
 }
 
-pub fn initialize_db() -> Result<r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>> {
-    let manager = r2d2_sqlite::SqliteConnectionManager::file("./soundbase.db");
+pub fn initialize_db<P : AsRef<Path>>(path : P) -> Result<r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>> {
+    let manager = r2d2_sqlite::SqliteConnectionManager::file(path);
     let pool = r2d2::Pool::new(manager)?;
     let conn = pool.get()?;
     conn.execute_batch("\

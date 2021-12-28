@@ -16,6 +16,7 @@
 
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::env;
 use tokio::sync::RwLock;
 
 mod error;
@@ -26,7 +27,12 @@ pub mod generated;
 
 #[tokio::main]
 async fn main() {
-    let db = db::initialize_db().expect("Failed to create DB!");
+    let args : Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        panic!("Expected a database file destination!");
+    }
+    println!("Writing database to '{}'", &args[1]);
+    let db = db::initialize_db(&args[1]).expect("Failed to create DB!");
 
     let metadata_dissect = model::song_like::SourceMetadataDeterminationConfig::load_from_file("./config.json");
     println!("Read the following Metadata dissects:");
