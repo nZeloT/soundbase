@@ -57,7 +57,7 @@ pub async fn fetch_new_rockantenne_top20_of_week<DB>(db: DB) -> Result<()>
         .lines()
         .filter(|line| !line.is_empty())
         .map(|line| line.trim().unify_quotes().unify_apostrophes().replace("|", "I"))
-        .map(|line| {
+        .for_each(|line| {
             match pattern.captures(&line) {
                 Some(cap) => {
                     let mut pos_str = cap[1].to_string();

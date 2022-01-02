@@ -92,14 +92,14 @@ pub fn create_song_from_raw<DB>(db: &DB, raw: &RawSong) -> Result<Song>
 }
 
 pub trait SongFav {
-    fn fav_song(&self, song: &mut Song, meta: &SongMetadata) -> Result<SongState>;
-    fn unfav_song(&self, song: &mut Song, meta: &SongMetadata) -> Result<SongState>;
+    fn fav_song(&self, song: &mut Song) -> Result<SongState>;
+    fn unfav_song(&self, song: &mut Song) -> Result<SongState>;
 }
 
 impl<DB> SongFav for DB
     where DB: Save<Song>
 {
-    fn fav_song(&self, song: &mut Song, meta: &SongMetadata) -> Result<SongState> {
+    fn fav_song(&self, song: &mut Song) -> Result<SongState> {
         match song.is_faved {
             false => {
                 song.is_faved = true;
@@ -110,7 +110,7 @@ impl<DB> SongFav for DB
         }
     }
 
-    fn unfav_song(&self, song: &mut Song, meta: &SongMetadata) -> Result<SongState> {
+    fn unfav_song(&self, song: &mut Song) -> Result<SongState> {
         match song.is_faved {
             false => { Ok(SongState::NotFaved) }
             true => {

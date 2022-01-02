@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use super::{Result, DbPool, DbConn, db_error::DbError};
+use super::{Result, DbConn, db_error::DbError};
 
 pub fn last_row_id(db: &mut DbConn) -> Result<u64> {
     let mut prep_stmt = db.prepare("SELECT last_insert_rowid()")?;

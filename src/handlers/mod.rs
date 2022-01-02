@@ -14,17 +14,15 @@
  * limitations under the License.
  */
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use http::StatusCode;
 use tokio::sync::RwLock;
 
 use crate::db::DbPool;
-use crate::error::{Result, SoundbaseError};
+use crate::error::{Result};
 use crate::fetch;
 use crate::model::song_like::SourceMetadataDetermination;
-use crate::model::spotify;
 
 mod song_like_handler;
 

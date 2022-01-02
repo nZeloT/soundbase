@@ -24,14 +24,18 @@ mod tow_rock_antenne;
 pub fn fetch_albums_of_week(db : &DbPool) {
     let pool = db.clone();
     tokio::task::spawn(async move {
-        aow_rock_antenne::fetch_new_rockantenne_album_of_week(pool).await;
+        if let Err(e) = aow_rock_antenne::fetch_new_rockantenne_album_of_week(pool).await {
+            println!("AOW Fetch for Rock Antenne raised an Error! => {:?}", e);
+        }
     });
 }
 
 pub fn fetch_charts(db : &DbPool) {
     let pool = db.clone();
     tokio::task::spawn(async move {
-        tow_rock_antenne::fetch_new_rockantenne_top20_of_week(pool).await;
+        if let Err(e) = tow_rock_antenne::fetch_new_rockantenne_top20_of_week(pool).await {
+            println!("Charts Fetch for Rock Antenne raised an Error! => {:?}", e);
+        }
     });
 }
 

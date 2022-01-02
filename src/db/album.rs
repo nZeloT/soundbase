@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use super::{Result, DbPool, DbConn, Load, FindUnique, Save, Delete, FollowForeignReference, db_error::DbError};
+use super::{Result, DbPool, Load, FindUnique, Save, Delete, FollowForeignReference, db_error::DbError};
 use super::util::{last_row_id, delete};
 use super::artist::Artist;
 use rusqlite::ToSql;

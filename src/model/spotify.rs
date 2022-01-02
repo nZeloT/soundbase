@@ -14,12 +14,8 @@
  * limitations under the License.
  */
 
-use std::error::Error;
-use std::time::{Duration, Instant};
-
 use aspotify::Scope;
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 use crate::db::album::Album;
 use crate::db::artist::Artist;
@@ -178,7 +174,7 @@ impl Spotify {
         }
     }
 
-    pub async fn find_song_in_spotify<DB>(&self, mut db: DB, song: &Song) -> Option<String>
+    pub async fn find_song_in_spotify<DB>(&self, db: DB, song: &Song) -> Option<String>
         where DB: FollowForeignReference<Song, Artist> + FollowForeignReference<Song, Album>
     {
         if !self.is_initialized {
