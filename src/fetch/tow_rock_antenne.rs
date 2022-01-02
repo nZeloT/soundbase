@@ -30,20 +30,18 @@ struct Top20Entry {
     artist: String,
 }
 
-pub fn fetch_new_rockantenne_top20_of_week<DB>(db: DB) -> Result<()>
+pub async fn fetch_new_rockantenne_top20_of_week<DB>(db: DB) -> Result<()>
     where DB: Save<TopOfTheWeekEntry> + FindUnique<Song, FindSong> + FindUnique<Artist, FindArtist> + Save<Artist> + Save<Song>
 {
     println!("Fetching the new top 20!");
 
-    let top20page_body = reqwest::blocking::get("https://www.rockantenne.de/aktionen/top-20")?.text()?;
-    let top20page_body_parsed = scraper::Html::parse_document(&top20page_body);
-
+    let top20page_body = reqwest::get("https://www.rockantenne.de/aktionen/top-20").await?.text().await?;
     println!("Fetched Top20 Page Body");
 
-    let img_url = select_image_url(&top20page_body_parsed)?;
+    let img_url = select_image_url(&*top20page_body)?;
     println!("Determined image URL => {}", img_url);
 
-    let img_data = reqwest::blocking::get(img_url)?.bytes()?;
+    let img_data = reqwest::get(img_url).await?.bytes().await?;
     println!("Fetched Top20 image");
 
     //determine year and week of year
@@ -55,7 +53,7 @@ pub fn fetch_new_rockantenne_top20_of_week<DB>(db: DB) -> Result<()>
 
     let pattern = Regex::new("([0-9 .]+) (.+) - \"(.+)\"")?;
 
-    let entries = output
+    output
         .lines()
         .filter(|line| !line.is_empty())
         .map(|line| line.trim().unify_quotes().unify_apostrophes().replace("|", "I"))
@@ -78,9 +76,13 @@ pub fn fetch_new_rockantenne_top20_of_week<DB>(db: DB) -> Result<()>
                     };
                     if let Err(err) =  store_entry_to_db(&db, &entry, year, week) {
                         println!("Received error during entry storage! => {:?}", err);
+                    }else{
+                        println!("Stored {:?} in DB", entry);
                     }
                 },
-                None => {}
+                None => {
+                    println!("Unmatched line '{}'", line);
+                }
             }
         });
 
@@ -89,7 +91,8 @@ pub fn fetch_new_rockantenne_top20_of_week<DB>(db: DB) -> Result<()>
     Ok(())
 }
 
-fn select_image_url(body: &scraper::Html) -> Result<String> {
+fn select_image_url(html: &str) -> Result<String> {
+    let body = scraper::Html::parse_document(&html);
     let img_selector = get_selector("main > div.row > div > figure > img")?;
     let possible_img = body.select(&img_selector).next();
     match possible_img {

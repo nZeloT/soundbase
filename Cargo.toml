@@ -20,7 +20,7 @@ r2d2 = "0.8"
 r2d2_sqlite = "0.19"
 rusqlite = { version = "0.26", features = ["bundled"]}
 regex = "1.5"
-reqwest = { version = "0.11", features = ["blocking"]}
+reqwest = { version = "0.11"}
 scraper = "0.12"
 strsim = "0.10"
 aspotify = "0.7"

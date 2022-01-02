@@ -16,39 +16,23 @@
 
 use crate::error::{Result, SoundbaseError};
 use crate::db::{artist::*, album::*, album_of_week::AlbumOfTheWeek, album_of_week::AlbumsOfTheWeek, FindUnique, Save};
+use crate::db::album_of_week::AlbumOfTheWeekSource;
 use super::get_selector;
 
-pub fn fetch_new_rockantenne_album_of_week<DB>(db: DB) -> Result<()>
+pub async fn fetch_new_rockantenne_album_of_week<DB>(db: DB) -> Result<()>
     where DB: FindUnique<Artist, FindArtist> + FindUnique<Album, FindAlbum> + Save<Artist> + Save<Album> + Save<AlbumOfTheWeek> + AlbumsOfTheWeek
 {
     //1. fetch overview page
-    let overview_body = reqwest::blocking::get("https://www.rockantenne.de/musik/album-der-woche/")?.text()?;
-    let overview_body_parsed = scraper::Html::parse_document(&overview_body);
-
-    //3. from the top post extract
-    //  3.1 artist
-    // at the same time remove the " - " at the end of the artist string
-    let artist = select_artist(&overview_body_parsed)?.trim_end_matches(" - ").to_string();
-
-    //  3.2 album
-    let album = select_album(&overview_body_parsed)?;
-    //  3.3 date
-    let date_string = select_date(&overview_body_parsed)?;
-    //  3.4 link to full post
-    let full_post_url = select_full_post_link(&overview_body_parsed)?;
+    let overview_body = reqwest::get("https://www.rockantenne.de/musik/album-der-woche/").await?.text().await?;
+    let (artist, album, date_string, full_post_url) = parse_overview_body(&*overview_body)?;
 
     //4. fetch full post
     let mut url = "https://www.rockantenne.de".to_string();
     url += &full_post_url;
     println!("Requesting full post from => {}", url);
-    let full_body = reqwest::blocking::get(&url)?.text()?;
-    let full_body_parsed = scraper::Html::parse_document(&full_body);
-    //5. from full post extract
-    //  5.1 comment/reasoning
-    let reasoning_html = select_reasoning_html(&full_body_parsed)?;
-    let reasoning_text = select_reasoning_text(&full_body_parsed)?;
-    //  5.2 song list
-    let song_list_html = select_song_list(&full_body_parsed)?;
+    let full_body = reqwest::get(&url).await?.text().await?;
+
+    let (reasoning_html, song_list_html) = parse_full_post_body(&*full_body)?;
 
     println!("New Album of the Week:");
     println!("\tArtist => {}", artist);
@@ -56,7 +40,6 @@ pub fn fetch_new_rockantenne_album_of_week<DB>(db: DB) -> Result<()>
     println!("\tDate => {}", date_string);
     println!("\tFull Post URI => {}", full_post_url);
     println!("\tReasoning HTML => {}", reasoning_html);
-    println!("\tReasoning Text => {:?}", reasoning_text);
     println!("\tSong List => {}", song_list_html);
     println!();
 
@@ -96,7 +79,7 @@ pub fn fetch_new_rockantenne_album_of_week<DB>(db: DB) -> Result<()>
                                            db_album,
                                            song_list_html
     );
-    match db.get_current_album_of_week()? {
+    match db.get_current_album_of_week(AlbumOfTheWeekSource::RockAntenne)? {
         Some(aofw) => {
             //to prevent double entries of the same album first check for existence
             if new_aofw == aofw {
@@ -109,6 +92,35 @@ pub fn fetch_new_rockantenne_album_of_week<DB>(db: DB) -> Result<()>
     db.save(&mut new_aofw)?;
     println!("Stored new Album of Week => {:?}", new_aofw);
     Ok(())
+}
+
+fn parse_overview_body(html : &str) -> Result<(String, String, String, String)> {
+    let overview_body_parsed = scraper::Html::parse_document(html);
+
+    //3. from the top post extract
+    //  3.1 artist
+    // at the same time remove the " - " at the end of the artist string
+    let artist = select_artist(&overview_body_parsed)?.trim_end_matches(" - ").to_string();
+
+    //  3.2 album
+    let album = select_album(&overview_body_parsed)?;
+    //  3.3 date
+    let date_string = select_date(&overview_body_parsed)?;
+    //  3.4 link to full post
+    let full_post_url = select_full_post_link(&overview_body_parsed)?;
+
+    Ok((artist, album, date_string, full_post_url))
+}
+
+fn parse_full_post_body(html : &str) -> Result<(String, String)> {
+    let full_body_parsed = scraper::Html::parse_document(html);
+    //5. from full post extract
+    //  5.1 comment/reasoning
+    let reasoning_html = select_reasoning_html(&full_body_parsed)?;
+    //  5.2 song list
+    let song_list_html = select_song_list(&full_body_parsed)?;
+
+    Ok((reasoning_html, song_list_html))
 }
 
 fn select_artist(overview: &scraper::Html) -> Result<String> {

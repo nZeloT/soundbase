@@ -84,7 +84,7 @@ impl PartialEq for AlbumOfTheWeek {
 
 pub trait AlbumsOfTheWeek {
     fn get_current_album_of_week(&self, source: AlbumOfTheWeekSource) -> Result<Option<AlbumOfTheWeek>>;
-    fn get_albums_of_week(&self, offset: u8, limit: u8, source: Option<AlbumOfTheWeekSource>, year: Option<u64>, week: Option<u64>) -> Result<Vec<AlbumOfTheWeek>>;
+    fn get_albums_of_week(&self, offset: u8, limit: u8, source: AlbumOfTheWeekSource, year: Option<u64>, week: Option<u64>) -> Result<Vec<AlbumOfTheWeek>>;
 }
 
 impl AlbumsOfTheWeek for DbPool {
@@ -95,10 +95,7 @@ impl AlbumsOfTheWeek for DbPool {
 
     fn get_albums_of_week(&self, offset: u8, limit: u8, source: AlbumOfTheWeekSource, year: Option<u64>, week: Option<u64>) -> Result<Vec<AlbumOfTheWeek>> {
         let query: String = {
-            let mut base: String = "SELECT * FROM albums_of_week WHERE ".to_string();
-            if let Some(s) = source {
-                base += "source_name = ?";
-            }
+            let mut base: String = "SELECT * FROM albums_of_week WHERE source_name = ?".to_string();
             if year.is_some() || week.is_some() {
                 if let Some(y) = year {
                     base += " AND year = ";
@@ -115,7 +112,7 @@ impl AlbumsOfTheWeek for DbPool {
             base += " LIMIT ? OFFSET ?";
             base
         };
-        match self.get() {
+        let albums = match self.get() {
             Ok(mut conn) => {
                 let mut stmt = conn.prepare(query.as_str())?;
                 let mut rows = stmt.query(rusqlite::params![source.to_string(), limit, offset])?;
@@ -137,7 +134,7 @@ impl AlbumsOfTheWeek for DbPool {
                 Ok(result)
             }
             Err(_) => Err(DbError::pool_timeout())
-        }
+        }?;
         Ok(albums)
     }
 }

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-use test::RunIgnored::No;
-
 use super::{db_error::DbError, DbPool, Result, Save};
 use super::song::Song;
 use super::util::last_row_id;
