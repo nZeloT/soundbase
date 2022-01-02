@@ -24,9 +24,10 @@ pub mod model;
 pub mod db;
 pub mod handlers;
 pub mod generated;
+pub mod fetch;
 pub mod string_utils;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() {
     let args : Vec<String> = env::args().collect();
     if args.len() < 2 {
@@ -65,15 +66,15 @@ mod filters {
     use std::sync::Arc;
     use tokio::sync::RwLock;
     use warp::Filter;
+    use crate::db::DbPool;
 
     use super::handlers;
 
-    type DB = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
     type Dissects = Arc<Vec<super::model::song_like::SourceMetadataDetermination>>;
     type Spotify = Arc<RwLock<super::model::spotify::Spotify>>;
 
     pub fn endpoints(
-        db: DB,
+        db: DbPool,
         dissects: Dissects,
         spotify: Spotify,
     ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
@@ -104,21 +105,21 @@ mod filters {
     }
 
     pub fn fetch_tow(
-        db: DB
+        db: DbPool
     ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("fetch" / "Top20OfWeek")
+        warp::path!("fetch" / "Charts")
             .and(warp::get())
             .and(with_db(db))
-            .and_then(handlers::fetch_top_20_of_week)
+            .and_then(handlers::fetch_charts)
     }
 
     pub fn fetch_aow(
-        db: DB
+        db: DbPool
     ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("fetch" / "AlbumOfWeek")
+        warp::path!("fetch" / "AlbumsOfWeek")
             .and(warp::get())
             .and(with_db(db))
-            .and_then(handlers::fetch_album_of_week)
+            .and_then(handlers::fetch_albums_of_week)
     }
 
     pub fn spotify_start_authorization(
@@ -140,7 +141,7 @@ mod filters {
             .and_then(handlers::spotify_auth_callback)
     }
 
-    fn with_db(db: DB) -> impl Filter<Extract=(DB, ), Error=std::convert::Infallible> + Clone {
+    fn with_db(db: DbPool) -> impl Filter<Extract=(DbPool, ), Error=std::convert::Infallible> + Clone {
         warp::any().map(move || db.clone())
     }
 

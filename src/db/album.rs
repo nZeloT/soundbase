@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use super::{Result, DB, Load, FindUnique, Save, Delete, FollowForeignReference, db_error::DbError};
+use super::{Result, DbPool, DbConn, Load, FindUnique, Save, Delete, FollowForeignReference, db_error::DbError};
 use super::util::{last_row_id, delete};
 use super::artist::Artist;
 use rusqlite::ToSql;
@@ -42,32 +42,37 @@ impl Album {
     }
 }
 
-impl Load<Album> for DB {
-    fn load(&mut self, id: u64) -> Result<Album> {
+impl Load<Album> for DbPool {
+    fn load(&self, id: u64) -> Result<Album> {
         if id == 0 {
             Err(DbError::new("Invalid ID given!"))
         }else {
-            let mut prep_stmt = self.prepare("SELECT album_name, album_spot_id, artist_id FROM albums WHERE album_id = ? LIMIT 1")?;
-            let mut rows = prep_stmt.query([
-                id
-            ])?;
-            match rows.next()? {
-                Some(row) => {
-                    Ok(Album {
-                        id,
-                        name: row.get(0)?,
-                        spot_id: row.get(1)?,
-                        artist_id: row.get(2)?,
-                    })
-                }
-                None => Err(DbError::new("Didn't find the album for the given album_id!"))
+            match self.get() {
+                Ok(mut conn) => {
+                    let mut prep_stmt = conn.prepare("SELECT album_name, album_spot_id, artist_id FROM albums WHERE album_id = ? LIMIT 1")?;
+                    let mut rows = prep_stmt.query([
+                        id
+                    ])?;
+                    match rows.next()? {
+                        Some(row) => {
+                            Ok(Album {
+                                id,
+                                name: row.get(0)?,
+                                spot_id: row.get(1)?,
+                                artist_id: row.get(2)?,
+                            })
+                        }
+                        None => Err(DbError::new("Didn't find the album for the given album_id!"))
+                    }
+                },
+                Err(_) => Err(DbError::pool_timeout())
             }
         }
     }
 }
 
-impl FollowForeignReference<Album, Artist> for DB {
-    fn follow_reference(&mut self, to_follow: &Album) -> Result<Artist> {
+impl FollowForeignReference<Album, Artist> for DbPool {
+    fn follow_reference(&self, to_follow: &Album) -> Result<Artist> {
         self.load(to_follow.artist_id)
     }
 }
@@ -79,56 +84,73 @@ impl FindAlbum {
     }
 }
 
-impl FindUnique<Album, FindAlbum> for DB {
-    fn find_unique(&mut self, query: FindAlbum) -> Result<Option<Album>> {
+impl FindUnique<Album, FindAlbum> for DbPool {
+    fn find_unique(&self, query: FindAlbum) -> Result<Option<Album>> {
         assert_ne!(query.1, 0);
-        let mut stmt = self.prepare("SELECT * FROM albums WHERE album_name = ? AND artist_id = ? LIMIT 1")?;
-        let mut rows = stmt.query(rusqlite::params![&query.0, query.1])?;
+        match self.get() {
+            Ok(mut conn) => {
+                let mut stmt = conn.prepare("SELECT * FROM albums WHERE album_name = ? AND artist_id = ? LIMIT 1")?;
+                let mut rows = stmt.query(rusqlite::params![&query.0, query.1])?;
 
-        match rows.next()? {
-            Some(row) => Ok(Some(Album {
-                id: row.get(0)?,
-                artist_id: row.get(1)?,
-                name: row.get(2)?,
-                spot_id: row.get(3)?,
-            })),
-            None => Ok(None)
+                match rows.next()? {
+                    Some(row) => Ok(Some(Album {
+                        id: row.get(0)?,
+                        artist_id: row.get(1)?,
+                        name: row.get(2)?,
+                        spot_id: row.get(3)?,
+                    })),
+                    None => Ok(None)
+                }
+            },
+            Err(_) => Err(DbError::pool_timeout())
         }
+
     }
 }
 
-impl Save<Album> for DB {
-    fn save(&mut self, to_save: &mut Album) -> Result<()> {
+impl Save<Album> for DbPool {
+    fn save(&self, to_save: &mut Album) -> Result<()> {
         debug_assert!(to_save.artist_id != 0);
-        if to_save.id == 0 {
-            //Do insert
-            let result = {
-                let mut stmt = self.prepare("INSERT INTO albums (album_name,album_spot_id,artist_id) VALUES(?,?,?)")?;
-                stmt.execute(rusqlite::params![to_save.name, to_save.spot_id, to_save.artist_id])?
-            };
-            if result == 1 {
-                to_save.id = last_row_id(self)?;
-                Ok(())
-            } else {
-                Err(DbError::new("Failed to create new album with the given data!"))
-            }
-        } else {
-            //Do a update
-            let mut stmt = self.prepare("UPDATE albums SET album_name = ?, album_spot_id = ?, artist_id = ? WHERE album_id = ?")?;
-            let result = stmt.execute(rusqlite::params![to_save.name, to_save.spot_id, to_save.artist_id, to_save.id])?;
+        match self.get() {
+            Ok(mut conn) => {
+                if to_save.id == 0 {
+                    //Do insert
+                    let result = {
+                        let mut stmt = conn.prepare("INSERT INTO albums (album_name,album_spot_id,artist_id) VALUES(?,?,?)")?;
+                        stmt.execute(rusqlite::params![to_save.name, to_save.spot_id, to_save.artist_id])?
+                    };
+                    if result == 1 {
+                        to_save.id = last_row_id(&mut conn)?;
+                        Ok(())
+                    } else {
+                        Err(DbError::new("Failed to create new album with the given data!"))
+                    }
+                } else {
+                    //Do a update
+                    let mut stmt = conn.prepare("UPDATE albums SET album_name = ?, album_spot_id = ?, artist_id = ? WHERE album_id = ?")?;
+                    let result = stmt.execute(rusqlite::params![to_save.name, to_save.spot_id, to_save.artist_id, to_save.id])?;
 
-            if result != 1 {
-                Err(DbError::new("Failed to update the given album!"))
-            }else{
-                Ok(())
-            }
+                    if result != 1 {
+                        Err(DbError::new("Failed to update the given album!"))
+                    }else{
+                        Ok(())
+                    }
+                }
+            },
+            Err(_) => Err(DbError::pool_timeout())
         }
+
     }
 }
 
-impl Delete<Album> for DB {
-    fn delete(&mut self, to_delete: &Album) -> Result<()> {
-        delete(self, "albums", "album_id", to_delete.id)
+impl Delete<Album> for DbPool {
+    fn delete(&self, to_delete: &Album) -> Result<()> {
+        match self.get() {
+            Ok(mut conn) => {
+                delete(&mut conn, "albums", "album_id", to_delete.id)
+            },
+            Err(_) => Err(DbError::pool_timeout())
+        }
     }
 }
 

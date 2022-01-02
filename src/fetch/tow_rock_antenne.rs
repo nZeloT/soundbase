@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 nzelot<leontsteiner@gmail.com>
+ * Copyright 2022 nzelot<leontsteiner@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ struct Top20Entry {
     artist: String,
 }
 
-pub fn fetch_new_rockantenne_top20_of_week<DB>(db: &mut DB) -> Result<()>
+pub fn fetch_new_rockantenne_top20_of_week<DB>(db: DB) -> Result<()>
     where DB: Save<TopOfTheWeekEntry> + FindUnique<Song, FindSong> + FindUnique<Artist, FindArtist> + Save<Artist> + Save<Song>
 {
     println!("Fetching the new top 20!");
@@ -76,7 +76,7 @@ pub fn fetch_new_rockantenne_top20_of_week<DB>(db: &mut DB) -> Result<()>
                         artist: artist_str,
                         title: title_str,
                     };
-                    if let Err(err) =  store_entry_to_db(db, &entry, year, week) {
+                    if let Err(err) =  store_entry_to_db(&db, &entry, year, week) {
                         println!("Received error during entry storage! => {:?}", err);
                     }
                 },
@@ -138,7 +138,7 @@ fn execute_tesseract(stdin: Vec<u8>) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
-fn store_entry_to_db<DB>(db: &mut DB, e: &Top20Entry, year: i32, week: u32) -> Result<()>
+fn store_entry_to_db<DB>(db: &DB, e: &Top20Entry, year: i32, week: u32) -> Result<()>
     where DB: FindUnique<Artist, FindArtist> + FindUnique<Song, FindSong> + Save<Artist> + Save<Song> + Save<TopOfTheWeekEntry>
 {
     //1. check whether the artist exists

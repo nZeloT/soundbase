@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-use super::{Result, DB, db_error::DbError};
+use super::{Result, DbPool, DbConn, db_error::DbError};
 
-pub fn last_row_id(db: &mut DB) -> Result<u64> {
+pub fn last_row_id(db: &mut DbConn) -> Result<u64> {
     let mut prep_stmt = db.prepare("SELECT last_insert_rowid()")?;
     let mut rows = prep_stmt.query(rusqlite::params![])?;
     match rows.next()? {
@@ -28,7 +28,7 @@ pub fn last_row_id(db: &mut DB) -> Result<u64> {
     }
 }
 
-pub fn delete(db: &mut DB, table: &'static str, id_field: &'static str, id: u64) -> Result<()> {
+pub fn delete(db: &mut DbConn, table: &'static str, id_field: &'static str, id: u64) -> Result<()> {
     if id == 0 {
         Err(DbError::new("Can't delete row with ID 0!"))
     }else {

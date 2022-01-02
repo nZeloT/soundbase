@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use super::{Result, DB, Load, FindUnique, Save, Delete, FollowForeignReference, db_error::DbError, song_history::SongHistDB};
+use super::{Result, DbPool, Load, FindUnique, Save, Delete, FollowForeignReference, db_error::DbError};
 use super::util::{last_row_id, delete};
 use super::artist::{Artist, FindArtist};
 use super::album::{Album, FindAlbum};
@@ -47,7 +47,7 @@ impl Song {
     }
 }
 
-pub fn create_song_from_raw<DB>(db: &mut DB, raw: &RawSong) -> Result<Song>
+pub fn create_song_from_raw<DB>(db: &DB, raw: &RawSong) -> Result<Song>
     where DB: FindUnique<Artist, FindArtist> + FindUnique<Album, FindAlbum> + Save<Artist> + Save<Album> + Save<Song>
 {
     let mut song = Song::default();
@@ -92,32 +92,30 @@ pub fn create_song_from_raw<DB>(db: &mut DB, raw: &RawSong) -> Result<Song>
 }
 
 pub trait SongFav {
-    fn fav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState>;
-    fn unfav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState>;
+    fn fav_song(&self, song: &mut Song, meta: &SongMetadata) -> Result<SongState>;
+    fn unfav_song(&self, song: &mut Song, meta: &SongMetadata) -> Result<SongState>;
 }
 
 impl<DB> SongFav for DB
-    where DB: Save<Song> + SongHistDB
+    where DB: Save<Song>
 {
-    fn fav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState> {
+    fn fav_song(&self, song: &mut Song, meta: &SongMetadata) -> Result<SongState> {
         match song.is_faved {
             false => {
                 song.is_faved = true;
                 self.save(song)?;
-                self.store_song_hist_entry(song, meta, true)?;
                 Ok(SongState::NowFaved)
             }
             true => Ok(SongState::Faved),
         }
     }
 
-    fn unfav_song(&mut self, song: &mut Song, meta: &SongMetadata) -> Result<SongState> {
+    fn unfav_song(&self, song: &mut Song, meta: &SongMetadata) -> Result<SongState> {
         match song.is_faved {
             false => { Ok(SongState::NotFaved) }
             true => {
                 song.is_faved = false;
                 self.save(song)?;
-                self.store_song_hist_entry(song, meta, false)?;
 
                 Ok(SongState::NowNotFaved)
             }
@@ -125,34 +123,39 @@ impl<DB> SongFav for DB
     }
 }
 
-impl Load<Song> for DB {
-    fn load(&mut self, id: u64) -> Result<Song> {
+impl Load<Song> for DbPool {
+    fn load(&self, id: u64) -> Result<Song> {
         if id == 0 {
             Err(DbError::new("Invalid ID given!"))
         }else {
-            let mut prep_stmt = self.prepare("SELECT song_title,song_spot_id,is_faved,artist_id,album_id FROM songs WHERE song_id = ? LIMIT 1")?;
-            let mut rows = prep_stmt.query([
-                id
-            ])?;
-            match rows.next()? {
-                Some(row) => {
-                    Ok(Song {
-                        id,
-                        name: row.get(0)?,
-                        spot_id: row.get(1)?,
-                        is_faved: row.get(2)?,
-                        artist_id: row.get(3)?,
-                        album_id: row.get(4)?,
-                    })
-                }
-                None => Err(DbError::new("Didn't find the song for the given song_id!"))
+            match self.get() {
+                Ok(mut conn) => {
+                    let mut prep_stmt = conn.prepare("SELECT song_title,song_spot_id,is_faved,artist_id,album_id FROM songs WHERE song_id = ? LIMIT 1")?;
+                    let mut rows = prep_stmt.query([
+                        id
+                    ])?;
+                    match rows.next()? {
+                        Some(row) => {
+                            Ok(Song {
+                                id,
+                                name: row.get(0)?,
+                                spot_id: row.get(1)?,
+                                is_faved: row.get(2)?,
+                                artist_id: row.get(3)?,
+                                album_id: row.get(4)?,
+                            })
+                        }
+                        None => Err(DbError::new("Didn't find the song for the given song_id!"))
+                    }
+                },
+                Err(_) => Err(DbError::pool_timeout())
             }
         }
     }
 }
 
-impl FollowForeignReference<Song, Album> for DB {
-    fn follow_reference(&mut self, to_follow: &Song) -> Result<Album> {
+impl FollowForeignReference<Song, Album> for DbPool {
+    fn follow_reference(&self, to_follow: &Song) -> Result<Album> {
         if to_follow.album_id.is_some() {
             self.load(to_follow.album_id.unwrap())
         } else {
@@ -161,8 +164,8 @@ impl FollowForeignReference<Song, Album> for DB {
     }
 }
 
-impl FollowForeignReference<Song, Artist> for DB {
-    fn follow_reference(&mut self, to_follow: &Song) -> Result<Artist> {
+impl FollowForeignReference<Song, Artist> for DbPool {
+    fn follow_reference(&self, to_follow: &Song) -> Result<Artist> {
         self.load(to_follow.artist_id)
     }
 }
@@ -176,92 +179,114 @@ impl FindSong {
         })
     }
 }
-impl FindUnique<Song, FindSong> for DB {
-    fn find_unique(&mut self, query: FindSong) -> Result<Option<Song>> {
+impl FindUnique<Song, FindSong> for DbPool {
+    fn find_unique(&self, query: FindSong) -> Result<Option<Song>> {
         assert_ne!(query.1, 0);
         assert!(query.2.is_some() && query.2.unwrap() != 0 || query.2.is_none());
 
-        let mut q = "SELECT * FROM songs WHERE song_title = ? AND artist_id = ? AND album_id ".to_string();
-        q += if query.2.is_some() { "= ?" } else { "IS ?"};
-        q += " LIMIT 1";
+        match self.get() {
+            Ok(mut conn) => {
+                let mut q = "SELECT * FROM songs WHERE song_title = ? AND artist_id = ? AND album_id ".to_string();
+                q += if query.2.is_some() { "= ?" } else { "IS ?"};
+                q += " LIMIT 1";
 
-        let mut stmt = self.prepare(&q)?;
-        let mut rows = stmt.query(rusqlite::params![query.0, query.1, query.2])?;
+                let mut stmt = conn.prepare(&q)?;
+                let mut rows = stmt.query(rusqlite::params![query.0, query.1, query.2])?;
 
-        match rows.next()? {
-            Some(row) => Ok(Some(Song {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                spot_id: row.get(2)?,
-                artist_id: row.get(3)?,
-                album_id: row.get(4)?,
-                is_faved: row.get(5)?,
-            })),
-            None => Ok(None)
-        }
-    }
-}
-
-impl FindUnique<Song, RawSong> for DB {
-    fn find_unique(&mut self, query: RawSong) -> Result<Option<Song>> {
-        let song_id: u64 = {
-            let mut stmt: rusqlite::Statement;
-            let mut result: rusqlite::Rows;
-
-            if !query.album.is_empty() {
-                stmt = self.prepare("SELECT song_id FROM songs,artists,albums WHERE songs.artist_id = artists.artist_id AND songs.album_id = albums.album_id \
-                AND songs.song_title = ? AND artists.artist_name = ? AND albums.album_name = ? LIMIT 1")?;
-                result = stmt.query(rusqlite::params![query.title, query.artist, query.album])?;
-            } else {
-                stmt = self.prepare("SELECT song_id FROM songs,artists WHERE songs.artist_id = artists.artist_id \
-                AND songs.song_title = ? AND artists.artist_name = ? LIMIT 1")?;
-                result = stmt.query(rusqlite::params![query.title, query.artist])?;
-            }
-
-            match result.next()? {
-                Some(row) => {
-                    let id: u64 = row.get(0)?;
-                    id
+                match rows.next()? {
+                    Some(row) => Ok(Some(Song {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        spot_id: row.get(2)?,
+                        artist_id: row.get(3)?,
+                        album_id: row.get(4)?,
+                        is_faved: row.get(5)?,
+                    })),
+                    None => Ok(None)
                 }
-                None => return Ok(None)
-            }
-        };
-
-        Ok(Some(self.load(song_id)?))
-    }
-}
-
-impl Save<Song> for DB {
-    fn save(&mut self, to_save: &mut Song) -> Result<()> {
-        debug_assert!(to_save.artist_id != 0);
-        if to_save.id == 0 {
-            //Do isert
-            let result : usize = {
-                let mut stmt = self.prepare("INSERT INTO songs (song_title, song_spot_id, artist_id, album_id, is_faved) VALUES(?,?,?,?,?)")?;
-                stmt.execute(rusqlite::params![to_save.name, to_save.spot_id, to_save.artist_id, to_save.album_id, to_save.is_faved])?
-            };
-            if result == 1 {
-                to_save.id = last_row_id(self)?;
-                Ok(())
-            } else {
-                Err(DbError::new("Failed to create new song with the given data!"))
-            }
-        } else {
-            //Do update
-            let mut stmt = self.prepare("UPDATE songs SET song_title = ?, song_spot_id = ?, artist_id = ?, album_id = ?, is_faved = ? WHERE song_id = ?")?;
-            let result = stmt.execute(rusqlite::params![to_save.name, to_save.spot_id, to_save.artist_id, to_save.album_id, to_save.is_faved, to_save.id])?;
-
-            if result != 1 {
-                Err(DbError::new("Failed to update the given song!"))
-            }else{
-                Ok(())
-            }
+            },
+            Err(_) => Err(DbError::pool_timeout())
         }
     }
 }
 
-impl Delete<Song> for DB {
-    fn delete(&mut self, to_delete: &Song) -> Result<()> {
-        delete(self, "songs", "song_id", to_delete.id)
+impl FindUnique<Song, RawSong> for DbPool {
+    fn find_unique(&self, query: RawSong) -> Result<Option<Song>> {
+        match self.get() {
+            Ok(mut conn) => {
+                let song_id: u64 = {
+                    let mut stmt: rusqlite::Statement;
+                    let mut result: rusqlite::Rows;
+
+                    if !query.album.is_empty() {
+                        stmt = conn.prepare("SELECT song_id FROM songs,artists,albums WHERE songs.artist_id = artists.artist_id AND songs.album_id = albums.album_id \
+                AND songs.song_title = ? AND artists.artist_name = ? AND albums.album_name = ? LIMIT 1")?;
+                        result = stmt.query(rusqlite::params![query.title, query.artist, query.album])?;
+                    } else {
+                        stmt = conn.prepare("SELECT song_id FROM songs,artists WHERE songs.artist_id = artists.artist_id \
+                AND songs.song_title = ? AND artists.artist_name = ? LIMIT 1")?;
+                        result = stmt.query(rusqlite::params![query.title, query.artist])?;
+                    }
+
+                    match result.next()? {
+                        Some(row) => {
+                            let id: u64 = row.get(0)?;
+                            id
+                        }
+                        None => return Ok(None)
+                    }
+                };
+
+                Ok(Some(self.load(song_id)?))
+            },
+            Err(_) => Err(DbError::pool_timeout())
+        }
+
+    }
+}
+
+impl Save<Song> for DbPool {
+    fn save(&self, to_save: &mut Song) -> Result<()> {
+        debug_assert!(to_save.artist_id != 0);
+        match self.get() {
+            Ok(mut conn) => {
+                if to_save.id == 0 {
+                    //Do isert
+                    let result : usize = {
+                        let mut stmt = conn.prepare("INSERT INTO songs (song_title, song_spot_id, artist_id, album_id, is_faved) VALUES(?,?,?,?,?)")?;
+                        stmt.execute(rusqlite::params![to_save.name, to_save.spot_id, to_save.artist_id, to_save.album_id, to_save.is_faved])?
+                    };
+                    if result == 1 {
+                        to_save.id = last_row_id(&mut conn)?;
+                        Ok(())
+                    } else {
+                        Err(DbError::new("Failed to create new song with the given data!"))
+                    }
+                } else {
+                    //Do update
+                    let mut stmt = conn.prepare("UPDATE songs SET song_title = ?, song_spot_id = ?, artist_id = ?, album_id = ?, is_faved = ? WHERE song_id = ?")?;
+                    let result = stmt.execute(rusqlite::params![to_save.name, to_save.spot_id, to_save.artist_id, to_save.album_id, to_save.is_faved, to_save.id])?;
+
+                    if result != 1 {
+                        Err(DbError::new("Failed to update the given song!"))
+                    }else{
+                        Ok(())
+                    }
+                }
+            },
+            Err(_) => Err(DbError::pool_timeout())
+        }
+    }
+}
+
+impl Delete<Song> for DbPool {
+    fn delete(&self, to_delete: &Song) -> Result<()> {
+        match self.get() {
+            Ok(mut conn) => {
+                delete(&mut conn, "songs", "song_id", to_delete.id)
+            },
+            Err(_) => Err(DbError::pool_timeout())
+        }
+
     }
 }

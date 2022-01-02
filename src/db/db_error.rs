@@ -17,6 +17,7 @@
 #[derive(Debug)]
 pub struct DbError(String);
 impl DbError {
+    pub fn pool_timeout() -> Self { DbError("Timeout while waiting for DB Connection!".to_string())}
     pub fn new(msg: &str) -> Self {
         DbError(msg.to_string())
     }

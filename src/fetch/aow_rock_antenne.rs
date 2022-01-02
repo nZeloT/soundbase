@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 nzelot<leontsteiner@gmail.com>
+ * Copyright 2022 nzelot<leontsteiner@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ use crate::error::{Result, SoundbaseError};
 use crate::db::{artist::*, album::*, album_of_week::AlbumOfTheWeek, album_of_week::AlbumsOfTheWeek, FindUnique, Save};
 use super::get_selector;
 
-pub fn fetch_new_rockantenne_album_of_week<DB>(db: &mut DB) -> Result<()>
+pub fn fetch_new_rockantenne_album_of_week<DB>(db: DB) -> Result<()>
     where DB: FindUnique<Artist, FindArtist> + FindUnique<Album, FindAlbum> + Save<Artist> + Save<Album> + Save<AlbumOfTheWeek> + AlbumsOfTheWeek
 {
     //1. fetch overview page
@@ -90,7 +90,12 @@ pub fn fetch_new_rockantenne_album_of_week<DB>(db: &mut DB) -> Result<()>
 
     //8. write new album of week entry
     let new_aofw_date = chrono::DateTime::parse_from_rfc3339(&date_string)?;
-    let mut new_aofw = AlbumOfTheWeek::new("Rock Antenne".to_string(), reasoning_html, new_aofw_date, db_album, song_list_html);
+    let mut new_aofw = AlbumOfTheWeek::new("Rock Antenne".to_string(),
+                                           reasoning_html,
+                                           new_aofw_date,
+                                           db_album,
+                                           song_list_html
+    );
     match db.get_current_album_of_week()? {
         Some(aofw) => {
             //to prevent double entries of the same album first check for existence

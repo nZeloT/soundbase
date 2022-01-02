@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use super::{Result, DB, Load, FindUnique, Save, Delete, db_error::DbError};
+use super::{Result, DbPool, Load, FindUnique, Save, Delete, db_error::DbError};
 use super::util::{last_row_id, delete};
 
 #[derive(Default, Debug)]
@@ -42,28 +42,33 @@ impl Artist {
     }
 }
 
-impl Load<Artist> for DB {
-    fn load(&mut self, id: u64) -> Result<Artist> {
+impl Load<Artist> for DbPool {
+    fn load(&self, id: u64) -> Result<Artist> {
         if id == 0 {
             Err(DbError::new("Invalid ID given!"))
         }else {
-            let mut prep_stmt = self.prepare("SELECT artist_name,artist_spot_id FROM artists WHERE artist_id = ? LIMIT 1")?;
-            let mut rows = prep_stmt.query([
-                id
-            ])?;
+            match self.get() {
+                Ok(mut conn) => {
+                    let mut prep_stmt = conn.prepare("SELECT artist_name,artist_spot_id FROM artists WHERE artist_id = ? LIMIT 1")?;
+                    let mut rows = prep_stmt.query([
+                        id
+                    ])?;
 
-            match rows.next()? {
-                Some(row) => {
-                    Ok(Artist {
-                        id,
-                        name: row.get(0)?,
-                        spot_id: row.get(1)?,
-                    })
-                }
+                    match rows.next()? {
+                        Some(row) => {
+                            Ok(Artist {
+                                id,
+                                name: row.get(0)?,
+                                spot_id: row.get(1)?,
+                            })
+                        }
 
-                None => {
-                    Err(DbError::new("Didn't find the artist for the given artist_id!"))
-                }
+                        None => {
+                            Err(DbError::new("Didn't find the artist for the given artist_id!"))
+                        }
+                    }
+                },
+                Err(_) => Err(DbError::pool_timeout())
             }
         }
     }
@@ -75,49 +80,67 @@ impl FindArtist {
         FindArtist(name)
     }
 }
-impl FindUnique<Artist, FindArtist> for DB {
-    fn find_unique(&mut self, query: FindArtist) -> Result<Option<Artist>> {
-        let mut stmt = self.prepare("SELECT * FROM artists WHERE artist_name = ? LIMIT 1")?;
-        let mut rows = stmt.query(rusqlite::params![query.0])?;
+impl FindUnique<Artist, FindArtist> for DbPool {
+    fn find_unique(&self, query: FindArtist) -> Result<Option<Artist>> {
+        match self.get() {
+            Ok(mut conn) => {
+                let mut stmt = conn.prepare("SELECT * FROM artists WHERE artist_name = ? LIMIT 1")?;
+                let mut rows = stmt.query(rusqlite::params![query.0])?;
 
-        match rows.next()? {
-            Some(row) => Ok(Some(Artist { id: row.get(0)?, name: row.get(1)?, spot_id: row.get(2)? })),
-            None => Ok(None)
+                match rows.next()? {
+                    Some(row) => Ok(Some(Artist { id: row.get(0)?, name: row.get(1)?, spot_id: row.get(2)? })),
+                    None => Ok(None)
+                }
+            },
+            Err(_) => Err(DbError::pool_timeout())
         }
+
     }
 }
 
-impl Save<Artist> for DB {
-    fn save(&mut self, to_save: &mut Artist) -> Result<()> {
-        if to_save.id == 0 {
-            //do insert
-            let result : usize = {
-                let mut stmt = self.prepare("INSERT INTO artists (artist_name,artist_spot_id) VALUES(?,?)")?;
-                stmt.execute(rusqlite::params![to_save.name, to_save.spot_id])?
-            };
-            if result == 1 {
-                //fetch the new artist ID
-                to_save.id = last_row_id(self)?;
-                Ok(())
-            } else {
-                Err(DbError::new("Failed to create new artist entry!"))
-            }
-        } else {
-            //do update
-            let mut stmt = self.prepare("UPDATE artists SET artist_name = ?, artist_spot_id = ? WHERE artist_id = ?")?;
-            let result = stmt.execute(rusqlite::params![to_save.name, to_save.spot_id, to_save.id])?;
+impl Save<Artist> for DbPool {
+    fn save(&self, to_save: &mut Artist) -> Result<()> {
+        match self.get() {
+            Ok(mut conn) => {
+                if to_save.id == 0 {
+                    //do insert
+                    let result : usize = {
+                        let mut stmt = conn.prepare("INSERT INTO artists (artist_name,artist_spot_id) VALUES(?,?)")?;
+                        stmt.execute(rusqlite::params![to_save.name, to_save.spot_id])?
+                    };
+                    if result == 1 {
+                        //fetch the new artist ID
+                        to_save.id = last_row_id(&mut conn)?;
+                        Ok(())
+                    } else {
+                        Err(DbError::new("Failed to create new artist entry!"))
+                    }
+                } else {
+                    //do update
+                    let mut stmt = conn.prepare("UPDATE artists SET artist_name = ?, artist_spot_id = ? WHERE artist_id = ?")?;
+                    let result = stmt.execute(rusqlite::params![to_save.name, to_save.spot_id, to_save.id])?;
 
-            if result != 1 {
-                Err(DbError::new("Failed to update the given artist!"))
-            }else{
-                Ok(())
-            }
+                    if result != 1 {
+                        Err(DbError::new("Failed to update the given artist!"))
+                    }else{
+                        Ok(())
+                    }
+                }
+            },
+            Err(_) => Err(DbError::pool_timeout())
         }
+
     }
 }
 
-impl Delete<Artist> for DB {
-    fn delete(&mut self, to_delete: &Artist) -> Result<()> {
-        delete(self, "artists", "artist_id", to_delete.id)
+impl Delete<Artist> for DbPool {
+    fn delete(&self, to_delete: &Artist) -> Result<()> {
+        match self.get() {
+            Ok(mut conn) =>  {
+                delete(&mut conn, "artists", "artist_id", to_delete.id)
+
+            },
+            Err(_) => Err(DbError::pool_timeout())
+        }
     }
 }

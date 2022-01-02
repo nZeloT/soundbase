@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-use super::{Result, DB, Save, db_error::DbError};
-use super::util::last_row_id;
+use test::RunIgnored::No;
+
+use super::{db_error::DbError, DbPool, Result, Save};
 use super::song::Song;
+use super::util::last_row_id;
 
 #[derive(Debug)]
 pub struct TopOfTheWeekEntry {
@@ -42,37 +44,66 @@ impl TopOfTheWeekEntry {
     }
 }
 
-pub trait TopOfTheWeek {
-    fn get_current_top_of_week() -> Vec<TopOfTheWeekEntry>;
-    fn get_top_of_week(year: u16, week: u8) -> Vec<TopOfTheWeekEntry>;
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum TopOfTheWeekSource {
+    Unkonwn,
+    RockAntenne,
 }
 
-impl Save<TopOfTheWeekEntry> for DB {
-    fn save(&mut self, to_save: &mut TopOfTheWeekEntry) -> Result<()> {
+impl From<&str> for TopOfTheWeekSource {
+    fn from(input: &str) -> Self {
+        match input.to_uppercase().as_str() {
+            "ROCKANTENNE" | "ROCK ANTENNE" => TopOfTheWeekSource::RockAntenne,
+            _ => TopOfTheWeekSource::Unkonwn
+        }
+    }
+}
+
+impl TopOfTheWeekSource {
+    pub fn to_string(&self) -> String {
+        match self {
+            TopOfTheWeekSource::Unkonwn => "Unknown".to_string(),
+            TopOfTheWeekSource::RockAntenne => "Rock Antenne".to_string()
+        }
+    }
+}
+
+pub trait TopOfTheWeek {
+    fn get_current_top_of_week(&self, source : TopOfTheWeekSource) -> Result<Vec<TopOfTheWeekEntry>>;
+    fn get_top_of_week(&self, offset: u8, limit : u8, source : TopOfTheWeekSource, year: Option<u16>, week: Option<u8>) -> Result<Vec<TopOfTheWeekEntry>>;
+}
+
+impl Save<TopOfTheWeekEntry> for DbPool {
+    fn save(&self, to_save: &mut TopOfTheWeekEntry) -> Result<()> {
         debug_assert!(to_save.song_id != 0);
 
-        if to_save.id == 0 {
-            //Do insert
-            let result: usize = {
-                let mut stmt = self.prepare("INSERT INTO top_charts_of_week (calendar_week,year,source_name,song_id,song_position) VALUES(?,?,?,?,?)")?;
-                stmt.execute(rusqlite::params![to_save.week, to_save.year, to_save.source, to_save.song_id, to_save.chart_position])?
-            };
-            if result == 1 {
-                to_save.id = last_row_id(self)?;
-                Ok(())
-            }else{
-                Err(DbError::new("Failed to ceate new top chart of the week entry with given data!"))
-            }
-        }else {
-            //Do Update
-            let mut stmt = self.prepare("UPDATE top_charts_of_week SET calendar_week = ?, year = ?, source_name = ?, song_id = ?, song_position = ? WHERE week_song_id = ?")?;
-            let result = stmt.execute(rusqlite::params![to_save.week, to_save.year, to_save.source, to_save.song_id, to_save.chart_position, to_save.id])?;
+        match self.get() {
+            Ok(mut conn) => {
+                if to_save.id == 0 {
+                    //Do insert
+                    let result: usize = {
+                        let mut stmt = conn.prepare("INSERT INTO top_charts_of_week (calendar_week,year,source_name,song_id,song_position) VALUES(?,?,?,?,?)")?;
+                        stmt.execute(rusqlite::params![to_save.week, to_save.year, to_save.source, to_save.song_id, to_save.chart_position])?
+                    };
+                    if result == 1 {
+                        to_save.id = last_row_id(&mut conn)?;
+                        Ok(())
+                    }else{
+                        Err(DbError::new("Failed to create new top chart of the week entry with given data!"))
+                    }
+                }else {
+                    //Do Update
+                    let mut stmt = conn.prepare("UPDATE top_charts_of_week SET calendar_week = ?, year = ?, source_name = ?, song_id = ?, song_position = ? WHERE week_song_id = ?")?;
+                    let result = stmt.execute(rusqlite::params![to_save.week, to_save.year, to_save.source, to_save.song_id, to_save.chart_position, to_save.id])?;
 
-            if result != 1 {
-                Err(DbError::new("Failed to update top chart of week entry with given data!"))
-            }else{
-                Ok(())
-            }
+                    if result != 1 {
+                        Err(DbError::new("Failed to update top chart of week entry with given data!"))
+                    }else{
+                        Ok(())
+                    }
+                }
+            },
+            Err(_) => Err(DbError::pool_timeout())
         }
     }
 }
