@@ -24,6 +24,7 @@ pub mod model;
 pub mod db;
 pub mod handlers;
 pub mod generated;
+pub mod string_utils;
 
 #[tokio::main]
 async fn main() {

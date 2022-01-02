@@ -20,6 +20,7 @@ use chrono::Datelike;
 use std::io::Write;
 use crate::error::{Result, SoundbaseError};
 use crate::db::{top_of_the_week::TopOfTheWeekEntry, Save, FindUnique, song::Song, song::FindSong, artist::*};
+use crate::string_utils::{UnifyQuotes, UnifyApostrophes};
 use super::get_selector;
 
 #[derive(Debug)]
@@ -45,39 +46,43 @@ pub fn fetch_new_rockantenne_top20_of_week<DB>(db: &mut DB) -> Result<()>
     let img_data = reqwest::blocking::get(img_url)?.bytes()?;
     println!("Fetched Top20 image");
 
-    let output = execute_tesseract(img_data.to_vec())?;
-
-    let pattern = Regex::new("([0-9 .]+) ([A-Za-z0-9.() &']+) - \"([A-Za-z0-9.() &']+)\"")?;
-
-    let entries = output
-        .lines()
-        .filter(|line| !line.is_empty())
-        .map(|line| line.trim().replace("“", "\"").replace("”", "\"").replace("|", "I"))
-        .filter(|line| pattern.is_match(&line))
-        .map(|line| {
-            let cap = pattern.captures(&line).expect("Expected match as the mapping is after filtering out all non matches!");
-            let mut pos_str = cap[1].to_string();
-            let artist_str = cap[2].to_string();
-            let title_str = cap[3].to_string();
-
-            pos_str = pos_str.replace(".", "").trim().to_string();
-
-            Top20Entry {
-                position: pos_str,
-                artist: artist_str,
-                title: title_str,
-            }
-        }).collect::<Vec<Top20Entry>>();
-
     //determine year and week of year
     let iso_week = chrono::Utc::today().iso_week();
     let year = iso_week.year();
     let week = iso_week.week();
 
-    for e in entries {
-        println!("{:?}", e);
-        store_entry_to_db(db, &e, year, week)?;
-    };
+    let output = execute_tesseract(img_data.to_vec())?;
+
+    let pattern = Regex::new("([0-9 .]+) (.+) - \"(.+)\"")?;
+
+    let entries = output
+        .lines()
+        .filter(|line| !line.is_empty())
+        .map(|line| line.trim().unify_quotes().unify_apostrophes().replace("|", "I"))
+        .map(|line| {
+            match pattern.captures(&line) {
+                Some(cap) => {
+                    let mut pos_str = cap[1].to_string();
+                    let artist_str = cap[2].to_string();
+                    let title_str = cap[3].to_string();
+
+                    pos_str = pos_str.replace(".", "").trim().to_string();
+                    if pos_str == "111" {
+                        pos_str = "11".to_string();
+                    }
+
+                    let entry = Top20Entry {
+                        position: pos_str,
+                        artist: artist_str,
+                        title: title_str,
+                    };
+                    if let Err(err) =  store_entry_to_db(db, &entry, year, week) {
+                        println!("Received error during entry storage! => {:?}", err);
+                    }
+                },
+                None => {}
+            }
+        });
 
     println!("Printed Output!");
 
@@ -96,13 +101,13 @@ fn select_image_url(body: &scraper::Html) -> Result<String> {
                     match possible_url {
                         Some(url) => {
                             Ok(url.to_string())
-                        },
+                        }
                         None => Err(SoundbaseError::new("Couldn't find URL in 'srcset' image attribute!"))
                     }
-                },
+                }
                 None => Err(SoundbaseError::new("No attribute named 'srcset' found in image element!"))
             }
-        },
+        }
         None => Err(SoundbaseError::new("No Element found with image element selector!"))
     }
 }
@@ -133,7 +138,7 @@ fn execute_tesseract(stdin: Vec<u8>) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
-fn store_entry_to_db<DB>(db: &mut DB, e : &Top20Entry, year: i32, week: u32) -> Result<()>
+fn store_entry_to_db<DB>(db: &mut DB, e: &Top20Entry, year: i32, week: u32) -> Result<()>
     where DB: FindUnique<Artist, FindArtist> + FindUnique<Song, FindSong> + Save<Artist> + Save<Song> + Save<TopOfTheWeekEntry>
 {
     //1. check whether the artist exists

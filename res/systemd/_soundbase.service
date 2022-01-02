@@ -6,6 +6,9 @@ After=multi-user.target
 User=pi
 Type=idle
 WorkingDirectory=/home/pi/soundbase/
+Environment="CLIENT_ID=<client>"
+Environment="CLIENT_SECRET=<secret>"
+Environment="REDIRECT_URI=http://philly.local:3333/spotify/auth_callback"
 ExecStart=/home/pi/soundbase/target/release/soundbase /mnt/data/.soundbase.db
 
 Restart=on-failure
