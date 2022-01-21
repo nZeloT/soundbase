@@ -40,20 +40,11 @@ impl warp::Reply for SoundbaseError {
     }
 }
 
-impl From<r2d2::Error> for SoundbaseError {
-    fn from(e: r2d2::Error) -> SoundbaseError {
+impl From<diesel::r2d2::Error> for SoundbaseError {
+    fn from(e: diesel::r2d2::Error) -> SoundbaseError {
         SoundbaseError {
             http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
             msg: e.to_string(),
-        }
-    }
-}
-
-impl From<rusqlite::Error> for SoundbaseError {
-    fn from(e: rusqlite::Error) -> SoundbaseError {
-        SoundbaseError {
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string()
         }
     }
 }
@@ -114,6 +105,33 @@ impl From<FromUtf8Error> for SoundbaseError {
 
 impl From<ParseIntError> for SoundbaseError {
     fn from(e: ParseIntError) -> Self {
+        SoundbaseError{
+            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
+            msg: e.to_string()
+        }
+    }
+}
+
+impl From<rspotify::ClientError> for SoundbaseError {
+    fn from(e: rspotify::ClientError) -> Self {
+        SoundbaseError{
+            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
+            msg: e.to_string()
+        }
+    }
+}
+
+impl From<rspotify::model::IdError> for SoundbaseError {
+    fn from(e: rspotify::model::IdError) -> Self {
+        SoundbaseError{
+            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
+            msg: e.to_string()
+        }
+    }
+}
+
+impl From<rspotify::model::ModelError> for SoundbaseError {
+    fn from(e : rspotify::model::ModelError) -> Self {
         SoundbaseError{
             http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
             msg: e.to_string()

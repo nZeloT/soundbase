@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
-use std::process::{Command, Stdio};
-use regex::Regex;
-use chrono::Datelike;
 use std::io::Write;
+use std::process::{Command, Stdio};
+
+use chrono::Datelike;
+use regex::Regex;
+
+use crate::db_new::DbApi;
+use crate::db_new::models::NewArtist;
 use crate::error::{Result, SoundbaseError};
-use crate::db::{top_of_the_week::TopOfTheWeekEntry, Save, FindUnique, song::Song, song::FindSong, artist::*};
-use crate::string_utils::{UnifyQuotes, UnifyApostrophes};
+use crate::string_utils::{UnifyApostrophes, UnifyQuotes};
+
 use super::get_selector;
 
 #[derive(Debug)]
@@ -30,8 +34,7 @@ struct Top20Entry {
     artist: String,
 }
 
-pub async fn fetch_new_rockantenne_top20_of_week<DB>(db: DB) -> Result<()>
-    where DB: Save<TopOfTheWeekEntry> + FindUnique<Song, FindSong> + FindUnique<Artist, FindArtist> + Save<Artist> + Save<Song>
+pub async fn fetch_new_rockantenne_top20_of_week(db: DbApi) -> Result<()>
 {
     println!("Fetching the new top 20!");
 
@@ -48,6 +51,11 @@ pub async fn fetch_new_rockantenne_top20_of_week<DB>(db: DB) -> Result<()>
     let iso_week = chrono::Utc::today().iso_week();
     let year = iso_week.year();
     let week = iso_week.week();
+
+    // if db.has_charts_for_week("Rock Antenne", year, week as i32)? {
+    //     println!("Already found charts for this week; Skipping");
+    //     return Ok(());
+    // }
 
     let output = execute_tesseract(img_data.to_vec())?;
 
@@ -74,12 +82,12 @@ pub async fn fetch_new_rockantenne_top20_of_week<DB>(db: DB) -> Result<()>
                         artist: artist_str,
                         title: title_str,
                     };
-                    if let Err(err) =  store_entry_to_db(&db, &entry, year, week) {
+                    if let Err(err) = store_entry_to_db(&db, &entry, year, week) {
                         println!("Received error during entry storage! => {:?}", err);
-                    }else{
+                    } else {
                         println!("Stored {:?} in DB", entry);
                     }
-                },
+                }
                 None => {
                     println!("Unmatched line '{}'", line);
                 }
@@ -141,40 +149,33 @@ fn execute_tesseract(stdin: Vec<u8>) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
-fn store_entry_to_db<DB>(db: &DB, e: &Top20Entry, year: i32, week: u32) -> Result<()>
-    where DB: FindUnique<Artist, FindArtist> + FindUnique<Song, FindSong> + Save<Artist> + Save<Song> + Save<TopOfTheWeekEntry>
+fn store_entry_to_db(db: &DbApi, e: &Top20Entry, year: i32, week: u32) -> Result<()>
 {
-    //1. check whether the artist exists
-    let db_artist = match db.find_unique(FindArtist::new(e.artist.clone()))? {
-        Some(a) => {
-            println!("Found existing Artist => {:?}", a);
-            a
-        }
-        None => {
-            let mut a = Artist::new(e.artist.clone(), "".to_string());
-            db.save(&mut a)?;
-            a
-        }
-    };
+    // let artist = db.get_or_create_artist(&*e.artist, || NewArtist {
+    //     name: &*e.artist,
+    //     spot_id: None,
+    // })?;
 
-    //2. check whether the song exists
-    let db_song = match db.find_unique(FindSong::new(e.title.clone(), &db_artist, None))? {
-        Some(s) => {
-            println!("Found existing song => {:?}", s);
-            s
-        }
-        None => {
-            let mut s = Song::new(e.title.clone(), "".to_string(), db_artist);
-            db.save(&mut s)?;
-            s
-        }
-    };
+    //TODO find album name by calling to spotify
 
-    let pos = e.position.parse::<u8>()?;
-
-    //3. insert top20 entry
-    let mut tow_entry = TopOfTheWeekEntry::new(year as u16, week as u8, "Rock Antenne".to_string(), pos, db_song);
-    db.save(&mut tow_entry)?;
-    println!("Successfully stored.");
+    // //2. check whether the song exists
+    // let db_song = match db.find_unique(FindSong::new(e.title.clone(), &db_artist, None))? {
+    //     Some(s) => {
+    //         println!("Found existing song => {:?}", s);
+    //         s
+    //     }
+    //     None => {
+    //         let mut s = Song::new(e.title.clone(), "".to_string(), db_artist);
+    //         db.save(&mut s)?;
+    //         s
+    //     }
+    // };
+    //
+    // let pos = e.position.parse::<u8>()?;
+    //
+    // //3. insert top20 entry
+    // let mut tow_entry = TopOfTheWeekEntry::new(year as u16, week as u8, "Rock Antenne".to_string(), pos, db_song);
+    // db.save(&mut tow_entry)?;
+    // println!("Successfully stored.");
     Ok(())
 }

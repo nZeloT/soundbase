@@ -1,0 +1,153 @@
+/*
+ * Copyright 2022 nzelot<leontsteiner@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+use diesel::prelude::*;
+
+use crate::db_new::{DbApi, DbPool, Result};
+use crate::db_new::db_error::DbError;
+use crate::db_new::{FindByFavedStatus, FindById};
+use crate::db_new::models::{Album, AlbumArtists, AlbumOfWeek, Artist, NewAlbum, Track};
+use crate::db_new::schema::*;
+
+pub trait AlbumDb: FindById<Album> + FindByFavedStatus<Album> {
+    fn new_album(&self, name: &str, year: i32, total_tracks: i32) -> Result<Album>;
+    fn new_full_album(&self, new_album: NewAlbum) -> Result<Album>;
+    fn find_by_artist_and_name(&self, artist: &Artist, name: &str) -> Result<Option<Album>>;
+    fn load_album_for_track(&self, track: &Track) -> Result<Album>;
+    fn load_album_for_aow(&self, aow: &AlbumOfWeek) -> Result<Album>;
+    fn set_was_aow(&self, album: &Album, was_aow: bool) -> Result<Album>;
+}
+
+impl AlbumDb for DbApi {
+    fn new_album(&self, name: &str, year: i32, total_tracks: i32) -> Result<Album> {
+        let new_album = NewAlbum {
+            name,
+            year,
+            total_tracks,
+            album_type: None,
+            is_faved: None,
+            was_aow: None,
+            spot_id: None,
+        };
+        self.new_full_album(new_album)
+    }
+
+    fn new_full_album(&self, new_album: NewAlbum) -> Result<Album> {
+        match self.0.get() {
+            Ok(conn) => {
+                let result = diesel::insert_into(albums::table)
+                    .values(&new_album)
+                    .get_result(&conn);
+                match result {
+                    Ok(value) => Ok(value),
+                    Err(e) => Err(DbError::from(e))
+                }
+            }
+            Err(_) => Err(DbError::pool_timeout())
+        }
+    }
+
+    fn find_by_artist_and_name(&self, artist: &Artist, name: &str) -> Result<Option<Album>> {
+        use diesel::dsl::any;
+        match self.0.get() {
+            Ok(conn) => {
+                let album_ids = AlbumArtists::belonging_to(artist).select(album_artists::album_id);
+                let result = albums::table
+                    .filter(albums::album_id.eq(any(album_ids)))
+                    .filter(albums::name.ilike(name))
+                    .first(&conn)
+                    .optional();
+                match result {
+                    Ok(v) => Ok(v),
+                    Err(e) => Err(DbError::from(e))
+                }
+            }
+            Err(_) => Err(DbError::pool_timeout())
+        }
+    }
+
+
+    fn load_album_for_track(&self, track: &Track) -> Result<Album> {
+        self.find_by_id(track.album_id)
+    }
+
+    fn load_album_for_aow(&self, aow: &AlbumOfWeek) -> Result<Album> {
+        self.find_by_id(aow.album_id)
+    }
+
+    fn set_was_aow(&self, album: &Album, was_aow: bool) -> Result<Album> {
+        match self.0.get() {
+            Ok(conn) => {
+                let result = diesel::update(
+                    albums::table.filter(albums::album_id.eq(album.album_id))
+                ).set(albums::was_aow.eq(was_aow))
+                    .get_result(&conn);
+                match result {
+                    Ok(v) => Ok(v),
+                    Err(e) => Err(DbError::from(e))
+                }
+            }
+            Err(_) => Err(DbError::pool_timeout())
+        }
+    }
+}
+
+impl FindById<Album> for DbApi {
+    fn find_by_id(&self, id: i32) -> Result<Album> {
+        use crate::db_new::schema::albums::dsl::*;
+        match self.0.get() {
+            Ok(conn) => {
+                let result = albums
+                    .find(id)
+                    .first(&conn);
+                match result {
+                    Ok(value) => Ok(value),
+                    Err(e) => Err(DbError::from(e))
+                }
+            }
+            Err(_) => Err(DbError::pool_timeout())
+        }
+    }
+}
+
+impl FindByFavedStatus<Album> for DbApi {
+    fn find_only_faved(&self, offset: i64, limit: i64) -> Result<Vec<Album>> {
+        _find_by_fav_status(&self.0, true, offset, limit)
+    }
+
+    fn find_only_unfaved(&self, offset: i64, limit: i64) -> Result<Vec<Album>> {
+        _find_by_fav_status(&self.0, false, offset, limit)
+    }
+}
+
+fn _find_by_fav_status(pool: &DbPool, faved: bool, offset: i64, limit: i64) -> Result<Vec<Album>> {
+    use crate::db_new::schema::albums::dsl::*;
+    match pool.get() {
+        Ok(conn) => {
+            let results = albums
+                .filter(is_faved.eq(faved))
+                .limit(limit)
+                .offset(offset)
+                .load::<Album>(&conn);
+
+            match results {
+                Ok(values) => Ok(values),
+                Err(e) => Err(DbError::from(e))
+            }
+        }
+        Err(_) => Err(DbError::pool_timeout())
+    }
+}

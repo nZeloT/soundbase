@@ -32,21 +32,14 @@ impl From<DbError> for crate::error::SoundbaseError {
     }
 }
 
-impl From<rusqlite::Error> for DbError {
-    fn from(e: rusqlite::Error) -> Self {
-        let msg = format!("{:?}", e);
-        DbError(msg)
-    }
-}
-
-impl From<chrono::ParseError> for DbError {
-    fn from(e: chrono::ParseError) -> Self {
+impl From<diesel::r2d2::Error> for DbError {
+    fn from(e: diesel::r2d2::Error) -> Self {
         DbError(e.to_string())
     }
 }
 
-impl From<r2d2::Error> for DbError {
-    fn from(e: r2d2::Error) -> Self {
+impl From<diesel::result::Error> for DbError {
+    fn from(e: diesel::result::Error) -> Self {
         DbError(e.to_string())
     }
 }

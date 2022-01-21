@@ -14,5 +14,51 @@
  * limitations under the License.
  */
 
-pub mod song_like;
-pub mod spotify;
+//pub mod spotify;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub enum UniversalTrackId {
+    Spotify(String),
+    Database(i32),
+}
+
+impl From<&str> for UniversalTrackId {
+    fn from(input: &str) -> Self {
+        match &input[..2] {
+            "s:" => UniversalTrackId::Spotify(input[2..].to_string()),
+            "d:" => UniversalTrackId::Database(input[2..].parse::<i32>().unwrap()),
+            _ => panic!("Invalid UniversalId!")
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct Page {
+    pub offset: Option<i64>,
+    pub limit: Option<i64>,
+}
+
+impl Page {
+    pub fn new(offset: i64, limit: i64) -> Self {
+        Self {
+            offset: Some(offset),
+            limit: Some(limit),
+        }
+    }
+
+    pub fn offset(&self) -> i64 {
+        match self.offset {
+            Some(o) => if o < 0 { 0 } else { o },
+            None => 0
+        }
+    }
+
+    pub fn limit(&self) -> i64 {
+        match self.limit {
+            Some(l) => if !(0..=50).contains(&l) { 50 } else { l },
+            None => 50
+        }
+    }
+}

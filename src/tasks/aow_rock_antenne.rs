@@ -14,17 +14,21 @@
  * limitations under the License.
  */
 
+use chrono::Datelike;
+use regex::Regex;
+use crate::db_new::album::AlbumDb;
+use crate::db_new::album_of_week::AlbumOfWeekDb;
+use crate::db_new::DbApi;
+use crate::db_new::models::{NewAlbum, NewAlbumOfWeek, NewArtist};
 use crate::error::{Result, SoundbaseError};
-use crate::db::{artist::*, album::*, album_of_week::AlbumOfTheWeek, album_of_week::AlbumsOfTheWeek, FindUnique, Save};
-use crate::db::album_of_week::AlbumOfTheWeekSource;
+
 use super::get_selector;
 
-pub async fn fetch_new_rockantenne_album_of_week<DB>(db: DB) -> Result<()>
-    where DB: FindUnique<Artist, FindArtist> + FindUnique<Album, FindAlbum> + Save<Artist> + Save<Album> + Save<AlbumOfTheWeek> + AlbumsOfTheWeek
+pub async fn fetch_new_rockantenne_album_of_week(api: DbApi) -> Result<()>
 {
     //1. fetch overview page
     let overview_body = reqwest::get("https://www.rockantenne.de/musik/album-der-woche/").await?.text().await?;
-    let (artist, album, date_string, full_post_url) = parse_overview_body(&*overview_body)?;
+    let (artist, album_name, date_string, full_post_url) = parse_overview_body(&*overview_body)?;
 
     //4. fetch full post
     let mut url = "https://www.rockantenne.de".to_string();
@@ -34,73 +38,59 @@ pub async fn fetch_new_rockantenne_album_of_week<DB>(db: DB) -> Result<()>
 
     let (reasoning_html, song_list_html) = parse_full_post_body(&*full_body)?;
 
+    let album_track_count = get_track_count_from_song_list(&*song_list_html)?;
+
     println!("New Album of the Week:");
     println!("\tArtist => {}", artist);
-    println!("\tAlbum => {}", album);
+    println!("\tAlbum => {}", album_name);
     println!("\tDate => {}", date_string);
+    println!("\tTrack Count => {}", album_track_count);
     println!("\tFull Post URI => {}", full_post_url);
     println!("\tReasoning HTML => {}", reasoning_html);
     println!("\tSong List => {}", song_list_html);
     println!();
 
-    //6. check for artist, if not write new
-    let db_artist = match db.find_unique(FindArtist::new(artist.clone()))? {
-        Some(a) => {
-            println!("Found existing Artist => {:?}", a);
-            a
-        }
-        None => {
-            let mut a = Artist::new(artist, "".to_string());
-            db.save(&mut a)?;
-            println!("Stored new Artist => {:?}", a);
-            a
-        }
-    };
-
-    //7. check for album if not write new
-    let db_album = match db.find_unique(FindAlbum::new(album.clone(), &db_artist))? {
-        Some(a) => {
-            println!("Found existing Album => {:?}", a);
-            a
-        }
-        None => {
-            let mut a = Album::new(album, "".to_string(), db_artist)?;
-            db.save(&mut a)?;
-            println!("Stored new Album => {:?}", a);
-            a
-        }
-    };
-
-    //8. write new album of week entry
     let new_aofw_date = chrono::DateTime::parse_from_rfc3339(&date_string)?;
-    let mut new_aofw = AlbumOfTheWeek::new("Rock Antenne".to_string(),
-                                           reasoning_html,
-                                           new_aofw_date,
-                                           db_album,
-                                           song_list_html
-    );
-    match db.get_current_album_of_week(AlbumOfTheWeekSource::RockAntenne)? {
-        Some(aofw) => {
-            //to prevent double entries of the same album first check for existence
-            if new_aofw == aofw {
-                return Err(SoundbaseError::new("Album of Week already found in DB. Skipping."));
+    if has_db_entry_for_week(&api, new_aofw_date.year(), new_aofw_date.iso_week().week() as i32)? {
+        let artist = api.get_or_create_artist(&*artist, || NewArtist { name: &*artist, spot_id: None })?;
+        let album = api.get_or_create_album(&artist, &*album_name, || {
+            NewAlbum {
+                name: &*album_name,
+                year: new_aofw_date.year(),
+                spot_id: None,
+                was_aow: None,
+                album_type: None,
+                is_faved: Some(false),
+                total_tracks: album_track_count,
             }
-        }
-        None => {}
-    };
+        })?;
 
-    db.save(&mut new_aofw)?;
-    println!("Stored new Album of Week => {:?}", new_aofw);
+        let _ = api.set_was_aow(&album, true)?;
+        
+        let _ = api.new_album_of_week(NewAlbumOfWeek{
+            album_id: album.album_id,
+            year: new_aofw_date.year(),
+            week: new_aofw_date.iso_week().week() as i32,
+            source_name: "Rock Antenne",
+            source_date: &*new_aofw_date.to_rfc3339(),
+            source_comment: &*reasoning_html,
+            track_list_raw: Some(song_list_html)
+        })?;
+
+    } else {
+        println!("This week already has an AOW for Rock Antenne; Skipping this one.");
+    }
+
     Ok(())
 }
 
-fn parse_overview_body(html : &str) -> Result<(String, String, String, String)> {
+fn parse_overview_body(html: &str) -> Result<(String, String, String, String)> {
     let overview_body_parsed = scraper::Html::parse_document(html);
 
     //3. from the top post extract
     //  3.1 artist
     // at the same time remove the " - " at the end of the artist string
-    let artist = select_artist(&overview_body_parsed)?.trim_end_matches(" - ").to_string();
+    let artist = select_artist(&overview_body_parsed)?.trim().trim_end_matches("-").trim_end_matches("–").trim().to_string();
 
     //  3.2 album
     let album = select_album(&overview_body_parsed)?;
@@ -112,7 +102,7 @@ fn parse_overview_body(html : &str) -> Result<(String, String, String, String)> 
     Ok((artist, album, date_string, full_post_url))
 }
 
-fn parse_full_post_body(html : &str) -> Result<(String, String)> {
+fn parse_full_post_body(html: &str) -> Result<(String, String)> {
     let full_body_parsed = scraper::Html::parse_document(html);
     //5. from full post extract
     //  5.1 comment/reasoning
@@ -121,6 +111,38 @@ fn parse_full_post_body(html : &str) -> Result<(String, String)> {
     let song_list_html = select_song_list(&full_body_parsed)?;
 
     Ok((reasoning_html, song_list_html))
+}
+
+fn get_track_count_from_song_list(song_list_html: &str) -> Result<i32> {
+    let plain_songs = song_list_html
+        .replace("<p>", "")
+        .replace("</p>", "")
+        .replace("<br>", "")
+        .replace("\t", "");
+    let songs = plain_songs.split("\n").collect::<Vec<&str>>();
+    let pattern = Regex::new("([0-9]+)\\. .+")?;
+    match songs.last() {
+        Some(&last) => {
+            match pattern.captures(last) {
+                Some(cap) => {
+                    let num_str = &cap[1];
+                    let num = num_str.parse::<i32>()?;
+                    Ok(num)
+                }
+                None => Err(SoundbaseError::new("Couldn't match regex for track count on AOW!"))
+            }
+        }
+        None => Err(SoundbaseError::new("Didn't find the last song of album!"))
+    }
+}
+
+fn has_db_entry_for_week(db : &DbApi, year : i32, iso_week : i32) -> Result<bool> {
+    let api : &dyn AlbumOfWeekDb = db;
+    let result = api.find_by_source_and_week("Rock Antenne", year, iso_week)?;
+    match result {
+        Some(_) => Ok(true),
+        None => Ok(false)
+    }
 }
 
 fn select_artist(overview: &scraper::Html) -> Result<String> {

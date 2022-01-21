@@ -14,26 +14,26 @@
  * limitations under the License.
  */
 
-use tokio::task;
+
+use crate::db_new::DbApi;
 use crate::error::{Result, SoundbaseError};
-use crate::db::{DbPool};
 
 mod aow_rock_antenne;
 mod tow_rock_antenne;
 
-pub fn fetch_albums_of_week(db : &DbPool) {
-    let pool = db.clone();
+pub fn launch_fetch_albums_of_week(db : &DbApi) {
+    let api = db.clone();
     tokio::task::spawn(async move {
-        if let Err(e) = aow_rock_antenne::fetch_new_rockantenne_album_of_week(pool).await {
+        if let Err(e) = aow_rock_antenne::fetch_new_rockantenne_album_of_week(api).await {
             println!("AOW Fetch for Rock Antenne raised an Error! => {:?}", e);
         }
     });
 }
 
-pub fn fetch_charts(db : &DbPool) {
-    let pool = db.clone();
+pub fn launch_fetch_charts(db : &DbApi) {
+    let api = db.clone();
     tokio::task::spawn(async move {
-        if let Err(e) = tow_rock_antenne::fetch_new_rockantenne_top20_of_week(pool).await {
+        if let Err(e) = tow_rock_antenne::fetch_new_rockantenne_top20_of_week(api).await {
             println!("Charts Fetch for Rock Antenne raised an Error! => {:?}", e);
         }
     });
