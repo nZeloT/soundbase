@@ -21,11 +21,13 @@ use crate::db_new::db_error::DbError;
 use crate::db_new::{FindByFavedStatus, FindById};
 use crate::db_new::models::{Album, AlbumArtists, AlbumOfWeek, Artist, NewAlbum, Track};
 use crate::db_new::schema::*;
+use crate::model::UniversalId;
 
-pub trait AlbumDb: FindById<Album> + FindByFavedStatus<Album> {
+pub trait AlbumDb: FindById<Album> + FindByFavedStatus<Album> + Sync {
     fn new_album(&self, name: &str, year: i32, total_tracks: i32) -> Result<Album>;
     fn new_full_album(&self, new_album: NewAlbum) -> Result<Album>;
     fn find_by_artist_and_name(&self, artist: &Artist, name: &str) -> Result<Option<Album>>;
+    fn find_by_universal_id(&self, id : &UniversalId) -> Result<Option<Album>>;
     fn load_album_for_track(&self, track: &Track) -> Result<Album>;
     fn load_album_for_aow(&self, aow: &AlbumOfWeek) -> Result<Album>;
     fn set_was_aow(&self, album: &Album, was_aow: bool) -> Result<Album>;
@@ -76,6 +78,27 @@ impl AlbumDb for DbApi {
                 }
             }
             Err(_) => Err(DbError::pool_timeout())
+        }
+    }
+
+    fn find_by_universal_id(&self, id: &UniversalId) -> Result<Option<Album>> {
+        match id {
+            UniversalId::Spotify(spot_id) => {
+                match self.0.get() {
+                    Ok(conn) => {
+                        let result = albums::table
+                            .filter(albums::spot_id.like(spot_id))
+                            .first(&conn)
+                            .optional();
+                        match result {
+                            Ok(v) => Ok(v),
+                            Err(e) => Err(DbError::from(e))
+                        }
+                    },
+                    Err(_) => Err(DbError::pool_timeout())
+                }
+            },
+            UniversalId::Database(album_id) => Ok(Some(self.find_by_id(*album_id)?))
         }
     }
 

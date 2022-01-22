@@ -20,13 +20,13 @@ use crate::db_new::db_error::DbError;
 use crate::db_new::{FindByFavedStatus, FindById};
 use crate::db_new::models::{Track, NewTrack, Album};
 use crate::db_new::schema::*;
-use crate::model::UniversalTrackId;
+use crate::model::UniversalId;
 
 pub trait TrackDb: FindById<Track> + FindByFavedStatus<Track> + Sync {
     fn new_track(&self, title: &str, album_id: i32, duration_ms: i32, is_faved: bool) -> Result<Track>;
     fn new_full_track(&self, new_track: NewTrack) -> Result<Track>;
     fn find_track_by_album(&self, album : &Album, name : &str) -> Result<Option<Track>>;
-    fn find_track_by_universal_id(&self, uni_id : &UniversalTrackId) -> Result<Option<Track>>;
+    fn find_track_by_universal_id(&self, uni_id : &UniversalId) -> Result<Option<Track>>;
     fn load_tracks_for_album(&self, album : &Album) -> Result<Vec<Track>>;
     fn set_faved_state(&self, track_id : i32, now_faved : bool) -> Result<()>;
 }
@@ -77,9 +77,9 @@ impl TrackDb for DbApi {
         }
     }
 
-    fn find_track_by_universal_id(&self, uni_id: &UniversalTrackId) -> Result<Option<Track>> {
+    fn find_track_by_universal_id(&self, uni_id: &UniversalId) -> Result<Option<Track>> {
         match uni_id {
-            UniversalTrackId::Spotify(spot) => {
+            UniversalId::Spotify(spot) => {
                 match self.0.get() {
                     Ok(conn) => {
                         let result = tracks::table
@@ -94,7 +94,7 @@ impl TrackDb for DbApi {
                     Err(_) => Err(DbError::pool_timeout())
                 }
             },
-            UniversalTrackId::Database(id) => Ok(Some(self.find_by_id(*id)?))
+            UniversalId::Database(id) => Ok(Some(self.find_by_id(*id)?))
         }
     }
     

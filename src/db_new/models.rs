@@ -157,6 +157,24 @@ pub struct Track {
     pub spot_id : Option<String>
 }
 
+#[derive(Queryable, Identifiable, Associations, AsChangeset, PartialEq, Debug)]
+#[belongs_to(Track)]
+#[belongs_to(Artist)]
+#[table_name = "track_artist"]
+#[primary_key(id)]
+pub struct TrackArtists {
+    pub id : i32,
+    pub track_id : i32,
+    pub artist_id : i32
+}
+
+#[derive(Insertable)]
+#[table_name = "track_artist"]
+pub struct NewTrackArtists {
+    pub track_id : i32,
+    pub artist_id : i32
+}
+
 #[derive(Insertable)]
 #[table_name = "tracks"]
 pub struct NewTrack<'a> {
@@ -200,7 +218,6 @@ pub struct NewChartsOfWeek {
 #[primary_key(track_fav_id)]
 pub struct TrackFavProposal {
     pub track_fav_id : i32,
-    pub status : i32,
     pub source_name : String,
     pub source_prop : String,
     pub ext_track_title : String,

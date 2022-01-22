@@ -25,7 +25,6 @@ use crate::spotify::SpotifyApi;
 
 mod error;
 mod model;
-//pub mod db;
 mod api_handler;
 mod generated;
 mod tasks;
@@ -39,19 +38,13 @@ async fn main() {
     let url = Url::parse(&*url_env_val).expect("Url is not valid!");
     let db_api = db_new::DbApi::new(url);
 
-    let spotify = match SpotifyApi::new() {
+    let spotify = match SpotifyApi::new().await {
         Ok(s) => s,
         Err(e) => {
             println!("{:?}", e);
             return;
         }
     };
-    // let mut spotify = crate::model::spotify::Spotify::new().unwrap();
-    // match spotify.finish_initialization_from_cache().await {
-    //     Ok(_) => println!("Spotify access enabled."),
-    //     Err(e) =>
-    //         println!("Couldn't load spotify access token from cache (Error: {:?}). Consider authenticating by calling /spotify/start_auth.", e)
-    // }
 
     let api = filters::endpoints(
         db_api,

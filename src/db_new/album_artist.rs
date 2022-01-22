@@ -20,21 +20,21 @@ use crate::db_new::{DbApi, Result};
 use crate::db_new::db_error::DbError;
 use crate::db_new::models::{Album, Artist, AlbumArtists, NewAlbumArtists};
 use crate::db_new::schema::*;
-use crate::db_new::UpdateSingle;
 
-pub trait AlbumArtistsDb : UpdateSingle<AlbumArtists> {
-    fn new_album_artist(&self, artist_id : i32, album_id : i32) -> Result<AlbumArtists>;
-    fn load_albums_for_artist(&self, artist: &Artist, offset : i64, limit : i64) -> Result<Vec<Album>>;
-    fn load_artists_for_album(&self, album: &Album, offset : i64, limit : i64) -> Result<Vec<Artist>>;
+pub trait AlbumArtistsDb {
+    fn new_album_artist(&self, artist_id: i32, album_id: i32) -> Result<AlbumArtists>;
+    fn new_album_artist_if_missing(&self, artist_id: i32, album_id: i32) -> Result<AlbumArtists>;
+    fn load_albums_for_artist(&self, artist: &Artist, offset: i64, limit: i64) -> Result<Vec<Album>>;
+    fn load_artists_for_album(&self, album: &Album, offset: i64, limit: i64) -> Result<Vec<Artist>>;
 }
 
 impl AlbumArtistsDb for DbApi {
     fn new_album_artist(&self, artist_id: i32, album_id: i32) -> Result<AlbumArtists> {
         match self.0.get() {
             Ok(conn) => {
-                let new_aa = NewAlbumArtists{
+                let new_aa = NewAlbumArtists {
                     album_id,
-                    artist_id
+                    artist_id,
                 };
                 let result = diesel::insert_into(album_artists::table)
                     .values(&new_aa)
@@ -43,8 +43,26 @@ impl AlbumArtistsDb for DbApi {
                     Ok(v) => Ok(v),
                     Err(e) => Err(DbError::from(e))
                 }
-            },
+            }
             Err(_) => Err(DbError::pool_timeout())
+        }
+    }
+
+    fn new_album_artist_if_missing(&self, artist_id: i32, album_id: i32) -> Result<AlbumArtists> {
+        let result: Option<AlbumArtists> = match self.0.get() {
+            Ok(conn) => {
+                album_artists::table
+                    .filter(album_artists::artist_id.eq(artist_id))
+                    .filter(album_artists::album_id.eq(album_id))
+                    .first(&conn)
+                    .optional()?
+            }
+            Err(_) => return Err(DbError::pool_timeout())
+        };
+
+        match result {
+            Some(link) => Ok(link),
+            None => self.new_album_artist(artist_id, album_id)
         }
     }
 
@@ -64,7 +82,7 @@ impl AlbumArtistsDb for DbApi {
                     Ok(v) => Ok(v),
                     Err(e) => Err(DbError::from(e))
                 }
-            },
+            }
             Err(_) => Err(DbError::pool_timeout())
         }
     }
@@ -85,25 +103,7 @@ impl AlbumArtistsDb for DbApi {
                     Ok(v) => Ok(v),
                     Err(e) => Err(DbError::from(e))
                 }
-            },
-            Err(_) => Err(DbError::pool_timeout())
-        }
-    }
-}
-
-impl UpdateSingle<AlbumArtists> for DbApi {
-    fn update(&self, to_update: &AlbumArtists) -> Result<()> {
-        use crate::db_new::schema::album_artists::dsl::*;
-        match self.0.get() {
-            Ok(conn) => {
-                let result = diesel::update(album_artists)
-                    .set(to_update)
-                    .execute(&conn);
-                match result {
-                    Ok(_) => Ok(()),
-                    Err(e) => Err(DbError::from(e))
-                }
-            },
+            }
             Err(_) => Err(DbError::pool_timeout())
         }
     }

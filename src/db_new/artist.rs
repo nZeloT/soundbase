@@ -21,11 +21,13 @@ use crate::db_new::db_error::DbError;
 use crate::db_new::{FindByFavedStatus, FindById, UpdateSingle};
 use crate::db_new::models::{Artist, NewArtist};
 use crate::db_new::schema::*;
+use crate::model::UniversalId;
 
 pub trait ArtistDb: FindById<Artist> + FindByFavedStatus<Artist> + UpdateSingle<Artist> {
     fn new_artist(&self, name: &str, spot_id: Option<String>) -> Result<Artist>;
     fn new_full_artist(&self, new_artist: NewArtist) -> Result<Artist>;
     fn find_artist_by_name(&self, name: &str) -> Result<Option<Artist>>;
+    fn find_artist_by_universal_id(&self, id : &UniversalId) -> Result<Option<Artist>>;
 }
 
 impl ArtistDb for DbApi {
@@ -65,6 +67,27 @@ impl ArtistDb for DbApi {
                 }
             }
             Err(_) => Err(DbError::pool_timeout())
+        }
+    }
+
+    fn find_artist_by_universal_id(&self, id: &UniversalId) -> Result<Option<Artist>> {
+        match id {
+            UniversalId::Spotify(spot_id) => {
+                match self.0.get() {
+                    Ok(conn) => {
+                        let result = artists::table
+                            .filter(artists::spot_id.like(spot_id))
+                            .first(&conn)
+                            .optional();
+                        match result {
+                            Ok(v) => Ok(v),
+                            Err(e) => Err(DbError::from(e))
+                        }
+                    },
+                    Err(_) => Err(DbError::pool_timeout())
+                }
+            },
+            UniversalId::Database(artist_id) => Ok(Some(self.find_by_id(*artist_id)?))
         }
     }
 }

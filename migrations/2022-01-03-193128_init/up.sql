@@ -14,11 +14,11 @@ create table artists
 (
     artist_id serial
         primary key,
-    name      VARCHAR(30) not null
+    name      VARCHAR(64) not null
         constraint artist_unique
             unique,
     is_faved  boolean     not null default false,
-    spot_id   VARCHAR(22)
+    spot_id   VARCHAR(64)
 );
 
 create table artist_genre
@@ -34,13 +34,13 @@ create table albums
 (
     album_id     serial
         primary key,
-    name         VARCHAR(30) not null,
+    name         VARCHAR(64) not null,
     album_type   integer     not null default 0,
     year         integer     not null,
     total_tracks integer,
     is_faved     boolean     not null default false,
     was_aow      boolean     not null default false,
-    spot_id      VARCHAR(22)
+    spot_id      VARCHAR(64)
 );
 
 create table album_artists
@@ -56,7 +56,7 @@ create table tracks
 (
     track_id     serial
         primary key,
-    title        VARCHAR(30) not null,
+    title        VARCHAR(64) not null,
     album_id     INTEGER     not null
         references albums (album_id)
             on delete cascade,
@@ -65,7 +65,7 @@ create table tracks
     duration_ms  integer     not null,
     is_faved     boolean     not null default false,
     local_file   VARCHAR(1024),
-    spot_id      VARCHAR(22)
+    spot_id      VARCHAR(64)
 );
 
 create table track_artist

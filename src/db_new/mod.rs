@@ -34,6 +34,7 @@ pub mod artist_genre;
 pub mod album;
 pub mod album_artist;
 pub mod track;
+pub mod track_artist;
 pub mod album_of_week;
 pub mod charts_of_week;
 pub mod track_fav_proposal;

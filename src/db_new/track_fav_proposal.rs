@@ -19,7 +19,7 @@ use diesel::prelude::*;
 use crate::db_new::{DbApi, Result};
 use crate::db_new::db_error::DbError;
 use crate::db_new::FindById;
-use crate::db_new::models::{NewTrackFavProposal, Track, TrackFavProposal};
+use crate::db_new::models::{NewTrackFavProposal, TrackFavProposal};
 use crate::db_new::schema::*;
 use crate::model::Page;
 

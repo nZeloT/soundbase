@@ -14,31 +14,29 @@
  * limitations under the License.
  */
 
-use std::arch::x86_64::_mm_getcsr;
 use std::str::FromStr;
 use std::default::Default;
+use std::sync::Arc;
+use tokio::sync::{RwLock, RwLockReadGuard};
 
-use rspotify::{AuthCodeSpotify, Config, Credentials, OAuth, scopes, Token};
+use rspotify::{AuthCodeSpotify, Config, Credentials, OAuth, scopes};
 use rspotify::clients::{BaseClient, OAuthClient};
-use rspotify::model::{AlbumId, ArtistId, FullAlbum, FullArtist, FullTrack, SearchResult, SimplifiedAlbum};
+use rspotify::model::{AlbumId, ArtistId, FullAlbum, FullArtist, FullTrack, SearchResult};
 use rspotify::model::{Market, SearchType, TrackId};
 
 use crate::error::SoundbaseError;
 use crate::model::Page;
 
-pub mod models;
-
 #[derive(Clone)]
-pub struct SpotifyApi();
+pub struct SpotifyApi(Arc<RwLock<AuthCodeSpotify>>);
 
 impl SpotifyApi {
-    pub fn new() -> Result<Self, SoundbaseError> {
-        SpotifyApi::_init()?;
-        Ok(SpotifyApi())
+    pub async fn new() -> Result<Self, SoundbaseError> {
+        Ok(SpotifyApi(Arc::new(RwLock::new(SpotifyApi::_init().await?))))
     }
 
     pub async fn search(&self, query : &str, page : Page) -> Result<Vec<FullTrack>, SoundbaseError> {
-        let client = self._get()?;
+        let client = self.0.read().await;
         match client.search(query, &SearchType::Track, Some(&Market::FromToken), None, Some(page.limit() as u32), Some(page.offset() as u32)).await {
             Ok(search_result) => {
                 match search_result {
@@ -48,29 +46,29 @@ impl SpotifyApi {
                     _ => Err(SoundbaseError::new("Expected Tracks but didn't get!"))
                 }
             },
-            Err(e) => Err(SoundbaseError::new("Failed to execute Search!"))
+            Err(_) => Err(SoundbaseError::new("Failed to execute Search!"))
         }
     }
 
     pub async fn get_track(&self, id : &str) -> Result<FullTrack, SoundbaseError> {
-        let client = self._get()?;
+        let client = self.0.read().await;
         let track_id = TrackId::from_str(id)?;
         Ok(client.track(&track_id).await?)
     }
 
     pub async fn get_album(&self, album_id : &AlbumId) -> Result<FullAlbum, SoundbaseError> {
-        let client = self._get()?;
+        let client = self.0.read().await;
         Ok(client.album(album_id).await?)
     }
 
     pub async fn get_artists(&self, artist_ids : &Vec<ArtistId>) -> Result<Vec<FullArtist>, SoundbaseError> {
-        let client = self._get()?;
-        Ok(client.artists(&artist_ids).await?)
+        let client = self.0.read().await;
+        Ok(client.artists(artist_ids).await?)
     }
 
     pub async fn save_track(&self, id: &str) -> Result<(), SoundbaseError>
     {
-        let client = self._get()?;
+        let client = self.0.read().await;
         let track_id = TrackId::from_str(id)?;
         match client.current_user_saved_tracks_add(vec![&track_id]).await {
             Ok(_) => Ok(()),
@@ -83,10 +81,10 @@ impl SpotifyApi {
 
     pub async fn remove_saved_track(&self, id: &str) -> Result<(), SoundbaseError>
     {
-        let client = self._get()?;
+        let client = self.0.read().await;
         let track_id = TrackId::from_str(id)?;
         match client.current_user_saved_tracks_delete(vec![&track_id]).await {
-            Ok(_) => Ok((())),
+            Ok(_) => Ok(()),
             Err(e) => {
                 println!("\tFailed to mark track as not liked => {:?}, {:?}", track_id, e);
                 Err(SoundbaseError::new("Failed to mark track as not liked"))
@@ -95,29 +93,13 @@ impl SpotifyApi {
     }
 
     pub async fn finish_initialization_with_code(&self, code: &str) -> Result<(), SoundbaseError> {
-        let mut auth = SpotifyApi::_without_token()?;
-        match auth.request_token(&code).await {
+        match self.0.write().await.request_token(&code).await {
             Ok(_) => Ok(()),
             Err(e) => Err(SoundbaseError::from(e))
         }
     }
 
-    fn _init() -> Result<(), SoundbaseError> {
-        let _ = match Token::from_cache(rspotify::DEFAULT_CACHE_PATH) {
-            Ok(_) => (),
-            Err(_) => {
-                SpotifyApi::_print_auth_url()?;
-            }
-        };
-        Ok(())
-    }
-
-    fn _get(&self) -> Result<AuthCodeSpotify, SoundbaseError> {
-        let token = Token::from_cache(rspotify::DEFAULT_CACHE_PATH)?;
-        Ok(AuthCodeSpotify::from_token(token))
-    }
-
-    fn _without_token() -> Result<AuthCodeSpotify, SoundbaseError> {
+    async fn _init() -> Result<AuthCodeSpotify, SoundbaseError> {
         let (redir, id, secret) = SpotifyApi::_get_env_vars()?;
         let config = Config {
             token_cached: true,
@@ -134,8 +116,28 @@ impl SpotifyApi {
         };
 
         let creds = Credentials::new(&*id, &*secret);
+        let mut client = AuthCodeSpotify::with_config(creds, oauth, config);
+        match client.read_token_cache(true).await {
+            Ok(opt) => {
+                match opt {
+                    Some(token) => {
+                        *client.get_token().lock().await.unwrap() = Some(token);
+                        client.refresh_token().await?;
+                        println!("Successfully refreshed spotify access token");
+                    },
+                    None => {
+                        println!("Infeasible token, reauthenticate!");
+                        println!("Authenticate with spotify at {}", client.get_authorize_url(false)?);
+                    }
+                }
+            },
+            Err(e) => {
+                println!("Couldn't read token cache! reauthenticate!");
+                println!("Authenticate with spotify at {}", client.get_authorize_url(false)?);
+            }
+        }
 
-        Ok(AuthCodeSpotify::with_config(creds, oauth, config))
+        Ok(client)
     }
 
     fn _get_env_vars() -> Result<(String, String, String), SoundbaseError> {
@@ -155,12 +157,5 @@ impl SpotifyApi {
         };
 
         Ok((redir_url, client_id, client_sec))
-    }
-
-    fn _print_auth_url() -> Result<(), SoundbaseError> {
-        let auth = SpotifyApi::_without_token()?;
-        println!("Spotify is not initialized visit {}", auth.get_authorize_url(false)?);
-
-        Ok(())
     }
 }
