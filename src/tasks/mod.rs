@@ -16,7 +16,8 @@
 
 
 use crate::db_new::DbApi;
-use crate::error::{Result, SoundbaseError};
+use crate::error::{Error};
+use crate::Result;
 
 mod aow_rock_antenne;
 mod tow_rock_antenne;
@@ -43,11 +44,6 @@ fn get_selector(selector: &'static str) -> Result<scraper::Selector> {
     let sel = scraper::Selector::parse(selector);
     match sel {
         Ok(s) => Ok(s),
-        Err(e) => {
-            Err(SoundbaseError {
-                http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-                msg: format!("{:?}", e),
-            })
-        }
+        Err(e) => Err(Error::InternalError(format!("{:?}", e)))
     }
 }

@@ -15,41 +15,22 @@
  */
 
 use std::collections::HashMap;
-use std::fmt::Debug;
 
 use http::StatusCode;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 use warp::reply::Reply;
 
-use crate::db_new::db_error::DbError;
-use crate::error::{Result, SoundbaseError};
-use crate::SpotifyApi;
+use crate::{SpotifyApi, WebResult};
+use crate::error::Error;
 
 pub mod tasks;
 pub mod track_proposals;
 pub mod song_like;
 
-#[derive(Serialize, Deserialize)]
-struct ApiError {
-    msg : String
-}
-
-impl From<SoundbaseError> for ApiError {
-    fn from(e: SoundbaseError) -> Self {
-        Self{msg: e.msg}
-    }
-}
-
-impl From<DbError> for ApiError {
-    fn from(e: DbError) -> Self {
-        Self{msg : format!("{:?}", e)}
-    }
-}
-
-pub async fn heartbeat() -> Result<impl warp::Reply, std::convert::Infallible> {
+pub async fn heartbeat() -> WebResult<impl Reply> {
     println!("Received a Heartbeat request.");
     println!();
-    Ok(reply(String::from(""), StatusCode::OK))
+    Ok(format!(""))
 }
 
 // pub async fn spotify_start_auth(api: SpotifyApi) -> Result<impl warp::Reply, std::convert::Infallible> {
@@ -57,20 +38,15 @@ pub async fn heartbeat() -> Result<impl warp::Reply, std::convert::Infallible> {
 //     Ok(reply(uri, http::StatusCode::OK))
 // }
 
-pub async fn spotify_auth_callback(api: SpotifyApi, params: HashMap<String, String>) -> Result<impl warp::Reply, std::convert::Infallible> {
+pub async fn spotify_auth_callback(api: SpotifyApi, params: HashMap<String, String>) -> WebResult<impl Reply> {
     match params.get("code") {
         Some(code) => {
             match api.finish_initialization_with_code(code).await {
-                Ok(_) => Ok(reply("Successful Authentication.".to_owned(), StatusCode::OK)),
-                Err(e) => {
-                    println!("\tResponding with Error => {:?}", e);
-                    Ok(reply(e.msg, e.http_code))
-                }
+                Ok(_) => Ok(format!("Successful Spotify Authentication")),
+                Err(e) => Err(warp::reject::custom(e))
             }
         }
-        None => {
-            Ok(reply("Failed to read parameter 'code' from query parameters!".to_owned(), StatusCode::INTERNAL_SERVER_ERROR))
-        }
+        None => Err(warp::reject::custom(Error::RequestError(format!("Couldn't parse query parameter 'code'!"))))
     }
 }
 
@@ -82,11 +58,4 @@ fn reply<T: warp::Reply>(r: T, status: StatusCode) -> impl warp::Reply {
 fn reply_json<T>(r : &T, status : StatusCode) -> impl warp::Reply
 where T : Serialize {
     reply(warp::reply::json(r), status)
-}
-
-fn handle_error<E>(message : &str, e : E) -> warp::reply::Response
-where E : Into<ApiError> + Debug {
-    println!("{} => {:?}", message, e);
-    let ret = e.into();
-    reply_json(&ret, StatusCode::INTERNAL_SERVER_ERROR).into_response()
 }

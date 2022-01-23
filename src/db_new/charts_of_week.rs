@@ -17,64 +17,42 @@ use diesel::prelude::*;
 
 use crate::db_new::{DbApi, Result};
 use crate::db_new::FindById;
-use crate::db_new::db_error::DbError;
 use crate::db_new::models::{ChartsOfWeekEntry, NewChartsOfWeek};
 use crate::db_new::schema::*;
 
-pub trait ChartsOfWeekDb: FindById<ChartsOfWeekEntry> {
+pub trait ChartsOfWeekDb: FindById<ChartsOfWeekEntry> + Sync {
     fn new_charts_of_week_entry(&self, new_charts_entry: NewChartsOfWeek) -> Result<ChartsOfWeekEntry>;
     fn find_by_source_and_week(&self, source: &str, year: i32, week: i32) -> Result<Option<Vec<ChartsOfWeekEntry>>>;
 }
 
 impl ChartsOfWeekDb for DbApi {
     fn new_charts_of_week_entry(&self, new_charts_entry: NewChartsOfWeek) -> Result<ChartsOfWeekEntry> {
-        match self.0.get() {
-            Ok(conn) => {
-                let result = diesel::insert_into(charts_of_week::table)
-                    .values(&new_charts_entry)
-                    .get_result(&conn);
-                match result {
-                    Ok(v) => Ok(v),
-                    Err(e) => Err(DbError::from(e))
-                }
-            }
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = diesel::insert_into(charts_of_week::table)
+            .values(&new_charts_entry)
+            .get_result(&conn);
+        Ok(result?)
     }
 
     fn find_by_source_and_week(&self, source: &str, year: i32, week: i32) -> Result<Option<Vec<ChartsOfWeekEntry>>> {
-        match self.0.get() {
-            Ok(conn) => {
-                let result = charts_of_week::table
-                    .filter(charts_of_week::year.eq(year))
-                    .filter(charts_of_week::calendar_week.eq(week))
-                    .filter(charts_of_week::source_name.ilike(source))
-                    .load::<ChartsOfWeekEntry>(&conn)
-                    .optional();
-                match result {
-                    Ok(v) => Ok(v),
-                    Err(e) => Err(DbError::from(e))
-                }
-            },
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = charts_of_week::table
+            .filter(charts_of_week::year.eq(year))
+            .filter(charts_of_week::calendar_week.eq(week))
+            .filter(charts_of_week::source_name.ilike(source))
+            .load::<ChartsOfWeekEntry>(&conn)
+            .optional();
+        Ok(result?)
     }
 }
 
 impl FindById<ChartsOfWeekEntry> for DbApi {
     fn find_by_id(&self, id: i32) -> Result<ChartsOfWeekEntry> {
         use crate::db_new::schema::charts_of_week::dsl::*;
-        match self.0.get() {
-            Ok(conn) => {
-                let result = charts_of_week
-                    .find(id)
-                    .first(&conn);
-                match result {
-                    Ok(v) => Ok(v),
-                    Err(e) => Err(DbError::from(e))
-                }
-            }
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = charts_of_week
+            .find(id)
+            .first(&conn);
+        Ok(result?)
     }
 }

@@ -15,8 +15,7 @@
  */
 use diesel::prelude::*;
 
-use crate::db_new::{DbApi, DbPool, Result};
-use crate::db_new::db_error::DbError;
+use crate::db_new::{DbApi, DbError, DbPool, Result};
 use crate::db_new::{FindByFavedStatus, FindById};
 use crate::db_new::models::{Track, NewTrack, Album};
 use crate::db_new::schema::*;
@@ -47,84 +46,54 @@ impl TrackDb for DbApi {
     }
 
     fn new_full_track(&self, new_track: NewTrack) -> Result<Track> {
-        match self.0.get() {
-            Ok(conn) => {
-                let result = diesel::insert_into(tracks::table)
-                    .values(&new_track)
-                    .get_result(&conn);
-                match result {
-                    Ok(v) => Ok(v),
-                    Err(e) => Err(DbError::from(e))
-                }
-            },
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = diesel::insert_into(tracks::table)
+            .values(&new_track)
+            .get_result(&conn);
+        Ok(result?)
     }
 
     fn find_track_by_album(&self, album: &Album, name: &str) -> Result<Option<Track>> {
-        match self.0.get() {
-            Ok(conn) => {
-                let result = Track::belonging_to(album)
-                    .filter(tracks::title.ilike(name))
-                    .first(&conn)
-                    .optional();
-                match result {
-                    Ok(v) => Ok(v),
-                    Err(e) => Err(DbError::from(e))
-                }
-            },
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = Track::belonging_to(album)
+            .filter(tracks::title.ilike(name))
+            .first(&conn)
+            .optional();
+        Ok(result?)
     }
 
     fn find_track_by_universal_id(&self, uni_id: &UniversalId) -> Result<Option<Track>> {
         match uni_id {
             UniversalId::Spotify(spot) => {
-                match self.0.get() {
-                    Ok(conn) => {
-                        let result = tracks::table
-                            .filter(tracks::spot_id.like(spot))
-                            .first(&conn)
-                            .optional();
-                        match result {
-                            Ok(v) => Ok(v),
-                            Err(e) => Err(DbError::from(e))
-                        }
-                    },
-                    Err(_) => Err(DbError::pool_timeout())
-                }
+                let conn = self.0.get()?;
+                let result = tracks::table
+                    .filter(tracks::spot_id.like(spot))
+                    .first(&conn)
+                    .optional();
+                Ok(result?)
             },
             UniversalId::Database(id) => Ok(Some(self.find_by_id(*id)?))
         }
     }
     
     fn load_tracks_for_album(&self, album: &Album) -> Result<Vec<Track>> {
-        match self.0.get() {
-            Ok(conn) => {
-                let result = Track::belonging_to(album)
-                    .load::<Track>(&conn);
-                match result {
-                    Ok(v) => Ok(v),
-                    Err(e) => Err(DbError::from(e))
-                }
-            },
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = Track::belonging_to(album)
+            .load::<Track>(&conn);
+        Ok(result?)
     }
 
     fn set_faved_state(&self, id: i32, now_faved: bool) -> Result<()> {
-        match self.0.get() {
-            Ok(conn) => {
-                let result = diesel::update(
-                    tracks::table.filter(tracks::track_id.eq(id))
-                ).set(tracks::is_faved.eq(now_faved))
-                    .execute(&conn);
-                match result {
-                    Ok(_) => Ok(()),
-                    Err(e) => Err(DbError::from(e))
-                }
-            },
-            Err(_) => Err(DbError::pool_timeout())
+        let conn = self.0.get()?;
+        let updated = diesel::update(
+            tracks::table.filter(tracks::track_id.eq(id))
+        ).set(tracks::is_faved.eq(now_faved))
+            .execute(&conn)?;
+        
+        if updated == 1 {
+            Ok(())
+        }else{
+            Err(DbError::UpdateError(format!("Failed to set track {} to fav state {}", id, now_faved)))
         }
     }
 }
@@ -132,18 +101,11 @@ impl TrackDb for DbApi {
 impl FindById<Track> for DbApi {
     fn find_by_id(&self, id: i32) -> Result<Track> {
         use crate::db_new::schema::tracks::dsl::*;
-        match self.0.get() {
-            Ok(conn) => {
-                let result = tracks
-                    .find(id)
-                    .first(&conn);
-                match result {
-                    Ok(v) => Ok(v),
-                    Err(e) => Err(DbError::from(e))
-                }
-            },
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = tracks
+            .find(id)
+            .first(&conn);
+        Ok(result?)
     }
 }
 
@@ -159,19 +121,11 @@ impl FindByFavedStatus<Track> for DbApi {
 
 fn _find_by_fav_status(pool : &DbPool, faved : bool, offset : i64, limit : i64) -> Result<Vec<Track>> {
     use crate::db_new::schema::tracks::dsl::*;
-    match pool.get() {
-        Ok(conn) => {
-            let results = tracks
-                .filter(is_faved.eq(faved))
-                .limit(limit)
-                .offset(offset)
-                .load::<Track>(&conn);
-
-            match results {
-                Ok(values) => Ok(values),
-                Err(e) => Err(DbError::from(e))
-            }
-        },
-        Err(_) => Err(DbError::pool_timeout())
-    }
+    let conn = pool.get()?;
+    let results = tracks
+        .filter(is_faved.eq(faved))
+        .limit(limit)
+        .offset(offset)
+        .load::<Track>(&conn);
+    Ok(results?)
 }

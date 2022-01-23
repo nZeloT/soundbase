@@ -17,7 +17,6 @@
 use diesel::prelude::*;
 
 use crate::db_new::{DbApi, DbPool, Result};
-use crate::db_new::db_error::DbError;
 use crate::db_new::{FindByFavedStatus, FindById};
 use crate::db_new::models::{Album, AlbumArtists, AlbumOfWeek, Artist, NewAlbum, Track};
 use crate::db_new::schema::*;
@@ -48,55 +47,34 @@ impl AlbumDb for DbApi {
     }
 
     fn new_full_album(&self, new_album: NewAlbum) -> Result<Album> {
-        match self.0.get() {
-            Ok(conn) => {
-                let result = diesel::insert_into(albums::table)
-                    .values(&new_album)
-                    .get_result(&conn);
-                match result {
-                    Ok(value) => Ok(value),
-                    Err(e) => Err(DbError::from(e))
-                }
-            }
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = diesel::insert_into(albums::table)
+            .values(&new_album)
+            .get_result(&conn);
+        Ok(result?)
     }
 
     fn find_by_artist_and_name(&self, artist: &Artist, name: &str) -> Result<Option<Album>> {
         use diesel::dsl::any;
-        match self.0.get() {
-            Ok(conn) => {
-                let album_ids = AlbumArtists::belonging_to(artist).select(album_artists::album_id);
-                let result = albums::table
-                    .filter(albums::album_id.eq(any(album_ids)))
-                    .filter(albums::name.ilike(name))
-                    .first(&conn)
-                    .optional();
-                match result {
-                    Ok(v) => Ok(v),
-                    Err(e) => Err(DbError::from(e))
-                }
-            }
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let album_ids = AlbumArtists::belonging_to(artist).select(album_artists::album_id);
+        let result = albums::table
+            .filter(albums::album_id.eq(any(album_ids)))
+            .filter(albums::name.ilike(name))
+            .first(&conn)
+            .optional();
+        Ok(result?)
     }
 
     fn find_by_universal_id(&self, id: &UniversalId) -> Result<Option<Album>> {
         match id {
             UniversalId::Spotify(spot_id) => {
-                match self.0.get() {
-                    Ok(conn) => {
-                        let result = albums::table
-                            .filter(albums::spot_id.like(spot_id))
-                            .first(&conn)
-                            .optional();
-                        match result {
-                            Ok(v) => Ok(v),
-                            Err(e) => Err(DbError::from(e))
-                        }
-                    },
-                    Err(_) => Err(DbError::pool_timeout())
-                }
+                let conn = self.0.get()?;
+                let result = albums::table
+                    .filter(albums::spot_id.like(spot_id))
+                    .first(&conn)
+                    .optional();
+                Ok(result?)
             },
             UniversalId::Database(album_id) => Ok(Some(self.find_by_id(*album_id)?))
         }
@@ -112,37 +90,23 @@ impl AlbumDb for DbApi {
     }
 
     fn set_was_aow(&self, album: &Album, was_aow: bool) -> Result<Album> {
-        match self.0.get() {
-            Ok(conn) => {
-                let result = diesel::update(
-                    albums::table.filter(albums::album_id.eq(album.album_id))
-                ).set(albums::was_aow.eq(was_aow))
-                    .get_result(&conn);
-                match result {
-                    Ok(v) => Ok(v),
-                    Err(e) => Err(DbError::from(e))
-                }
-            }
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = diesel::update(
+            albums::table.filter(albums::album_id.eq(album.album_id))
+        ).set(albums::was_aow.eq(was_aow))
+            .get_result(&conn);
+        Ok(result?)
     }
 }
 
 impl FindById<Album> for DbApi {
     fn find_by_id(&self, id: i32) -> Result<Album> {
         use crate::db_new::schema::albums::dsl::*;
-        match self.0.get() {
-            Ok(conn) => {
-                let result = albums
-                    .find(id)
-                    .first(&conn);
-                match result {
-                    Ok(value) => Ok(value),
-                    Err(e) => Err(DbError::from(e))
-                }
-            }
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = albums
+            .find(id)
+            .first(&conn);
+        Ok(result?)
     }
 }
 
@@ -158,19 +122,11 @@ impl FindByFavedStatus<Album> for DbApi {
 
 fn _find_by_fav_status(pool: &DbPool, faved: bool, offset: i64, limit: i64) -> Result<Vec<Album>> {
     use crate::db_new::schema::albums::dsl::*;
-    match pool.get() {
-        Ok(conn) => {
-            let results = albums
-                .filter(is_faved.eq(faved))
-                .limit(limit)
-                .offset(offset)
-                .load::<Album>(&conn);
-
-            match results {
-                Ok(values) => Ok(values),
-                Err(e) => Err(DbError::from(e))
-            }
-        }
-        Err(_) => Err(DbError::pool_timeout())
-    }
+    let conn = pool.get()?;
+    let results = albums
+        .filter(is_faved.eq(faved))
+        .limit(limit)
+        .offset(offset)
+        .load::<Album>(&conn);
+    Ok(results?)
 }

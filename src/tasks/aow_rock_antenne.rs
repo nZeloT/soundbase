@@ -16,11 +16,13 @@
 
 use chrono::Datelike;
 use regex::Regex;
+
 use crate::db_new::album::AlbumDb;
 use crate::db_new::album_of_week::AlbumOfWeekDb;
 use crate::db_new::DbApi;
 use crate::db_new::models::{NewAlbum, NewAlbumOfWeek, NewArtist};
-use crate::error::{Result, SoundbaseError};
+use crate::error::Error;
+use crate::Result;
 
 use super::get_selector;
 
@@ -129,10 +131,10 @@ fn get_track_count_from_song_list(song_list_html: &str) -> Result<i32> {
                     let num = num_str.parse::<i32>()?;
                     Ok(num)
                 }
-                None => Err(SoundbaseError::new("Couldn't match regex for track count on AOW!"))
+                None => Err(Error::InternalError(format!("Couldn't match regex for track count on AOW!")))
             }
         }
-        None => Err(SoundbaseError::new("Didn't find the last song of album!"))
+        None => Err(Error::InternalError(format!("Didn't find the last song of album!")))
     }
 }
 
@@ -152,10 +154,10 @@ fn select_artist(overview: &scraper::Html) -> Result<String> {
         Some(artist_el) => {
             match artist_el.text().next() {
                 Some(text) => Ok(text.to_string()),
-                None => Err(SoundbaseError::new("No Text found in artist element selector!"))
+                None => Err(Error::InternalError("No Text found in artist element selector!".to_string()))
             }
         }
-        None => Err(SoundbaseError::new("No Element found in artist element selector!"))
+        None => Err(Error::InternalError("No Element found in artist element selector!".to_string()))
     }
 }
 
@@ -164,7 +166,7 @@ fn select_album(overview: &scraper::Html) -> Result<String> {
     let possible_album = overview.select(&album_selector).next();
     match possible_album {
         Some(album_el) => Ok(album_el.inner_html()),
-        None => Err(SoundbaseError::new("No Element found in album element selector!"))
+        None => Err(Error::InternalError("No Element found in album element selector!".to_string()))
     }
 }
 
@@ -175,10 +177,10 @@ fn select_date(overview: &scraper::Html) -> Result<String> {
         Some(date_el) => {
             match date_el.value().attr("content") {
                 Some(c) => Ok(c.to_string()),
-                None => Err(SoundbaseError::new("No Attribute named content found in date element!"))
+                None => Err(Error::InternalError("No Attribute named content found in date element!".to_string()))
             }
         }
-        None => Err(SoundbaseError::new("No Element found in date element selector!"))
+        None => Err(Error::InternalError("No Element found in date element selector!".to_string()))
     }
 }
 
@@ -189,10 +191,10 @@ fn select_full_post_link(overview: &scraper::Html) -> Result<String> {
         Some(link_el) => {
             match link_el.value().attr("href") {
                 Some(c) => Ok(c.to_string()),
-                None => Err(SoundbaseError::new("No Attribute named href found in full post link element!"))
+                None => Err(Error::InternalError("No Attribute named href found in full post link element!".to_string()))
             }
         }
-        None => Err(SoundbaseError::new("No Element found in full post link element selector!"))
+        None => Err(Error::InternalError("No Element found in full post link element selector!".to_string()))
     }
 }
 
@@ -201,7 +203,7 @@ fn select_reasoning_html(full_post: &scraper::Html) -> Result<String> {
     let possible_reasoning = full_post.select(&reasoning_selector).next();
     match possible_reasoning {
         Some(reasoning_el) => Ok(reasoning_el.inner_html()),
-        None => Err(SoundbaseError::new("No Element found in reasoning element selector!"))
+        None => Err(Error::InternalError("No Element found in reasoning element selector!".to_string()))
     }
 }
 
@@ -210,7 +212,7 @@ fn select_reasoning_text(full_post: &scraper::Html) -> Result<Vec<&str>> {
     let possible_reasoning = full_post.select(&reasoning_selector).next();
     match possible_reasoning {
         Some(reasoning_el) => Ok(reasoning_el.text().collect::<Vec<_>>()),
-        None => Err(SoundbaseError::new("No Element found in reasoning element selector!"))
+        None => Err(Error::InternalError("No Element found in reasoning element selector!".to_string()))
     }
 }
 
@@ -219,6 +221,6 @@ fn select_song_list(full_post: &scraper::Html) -> Result<String> {
     let possible_song_list = full_post.select(&song_list_selector).next();
     match possible_song_list {
         Some(song_list_el) => Ok(song_list_el.inner_html()),
-        None => Err(SoundbaseError::new("No Element found in song list element selector!"))
+        None => Err(Error::InternalError("No Element found in song list element selector!".to_string()))
     }
 }

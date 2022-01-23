@@ -21,7 +21,6 @@
 //  4. /api/v1/track-proposal/<id>/matches?search=
 
 use std::collections::{HashMap, HashSet};
-use http::StatusCode;
 use rspotify::model::{ArtistId, FullArtist, FullTrack};
 use serde::{Deserialize, Serialize};
 use warp::reply::Reply;
@@ -34,11 +33,9 @@ use crate::db_new::models::{Artist, NewAlbum, NewArtist, NewTrack, Track, TrackF
 use crate::db_new::track::TrackDb;
 use crate::db_new::track_artist::TrackArtistsDb;
 use crate::db_new::track_fav_proposal::TrackFavProposalDb;
-use crate::error::SoundbaseError;
+use crate::error::Error;
 use crate::model::{AlbumType, Page, UniversalId};
-use crate::SpotifyApi;
-
-use super::{handle_error, reply, reply_json};
+use crate::{SpotifyApi, WebResult, Result};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MatchesQuery {
@@ -72,64 +69,63 @@ struct ProposalMatch {
     pub confidence: f32,
 }
 
-pub async fn load_proposals(db: DbApi, page: Page) -> Result<warp::reply::Response, std::convert::Infallible> {
+pub async fn load_proposals(db: DbApi, page: Page) -> WebResult<impl Reply> {
     let api: &dyn TrackFavProposalDb = &db;
     let results = api.load_track_proposals(&page);
     match results {
         Ok(data) => {
-            let ret = TrackFavProposalList::new(data, &page);
-            Ok(reply_json(&ret, StatusCode::OK).into_response())
+            Ok(warp::reply::json(&TrackFavProposalList::new(data, &page)))
         }
-        Err(e) => Ok(handle_error("Failed to load proposals!", e))
+        Err(e) => Err(warp::reject::custom(Error::DatabaseError(e)))
     }
 }
 
-pub async fn confirm_proposal(proposal_id: i32, uni_track_id: String, db: DbApi, spotify: SpotifyApi) -> Result<impl warp::Reply, std::convert::Infallible> {
+pub async fn confirm_proposal(proposal_id: i32, uni_track_id: String, db: DbApi, spotify: SpotifyApi) -> WebResult<impl Reply> {
     let api: &dyn TrackFavProposalDb = &db;
     let result = api.find_by_id(proposal_id);
     match result {
         Ok(proposal) => {
             let ret = confirm_match(db, spotify, proposal, UniversalId::from(&*uni_track_id)).await;
             match ret {
-                Ok(_) => Ok(reply("", StatusCode::OK).into_response()),
-                Err(e) => Ok(handle_error("Failed to confirm proposal", e))
+                Ok(_) => Ok(format!("")),
+                Err(e) => Err(warp::reject::custom(e))
             }
         }
-        Err(e) => Ok(handle_error("Failed to find proposal!", e))
+        Err(e) => Err(warp::reject::custom(Error::DatabaseError(e)))
     }
 }
 
-pub async fn discard_proposal(proposal_id: i32, db: DbApi) -> Result<warp::reply::Response, std::convert::Infallible> {
+pub async fn discard_proposal(proposal_id: i32, db: DbApi) -> WebResult<impl Reply> {
     let api: &dyn TrackFavProposalDb = &db;
     let proposal = api.find_by_id(proposal_id);
     match proposal {
         Ok(prop) => {
             let ret = discard_proposal_and_unfav_track(&db, prop);
             match ret {
-                Ok(_) => Ok(reply("", StatusCode::OK).into_response()),
-                Err(e) => Ok(handle_error("Failed to discard matches!", e))
+                Ok(_) => Ok(format!("")),
+                Err(e) => Err(warp::reject::custom(e))
             }
         }
-        Err(e) => Ok(handle_error("Failed to find proposal!", e))
+        Err(e) => Err(warp::reject::custom(Error::DatabaseError(e)))
     }
 }
 
-pub async fn load_proposal_matches(proposal_id: i32, query: MatchesQuery, db: DbApi, spotify: SpotifyApi) -> Result<warp::reply::Response, std::convert::Infallible> {
+pub async fn load_proposal_matches(proposal_id: i32, query: MatchesQuery, db: DbApi, spotify: SpotifyApi) -> WebResult<impl Reply> {
     let api: &dyn TrackFavProposalDb = &db;
     let proposal = api.find_by_id(proposal_id);
     match proposal {
         Ok(prop) => {
             let ret = find_matches(db, spotify, prop, query.search).await;
             match ret {
-                Ok(r) => Ok(reply_json(&r, StatusCode::OK).into_response()),
-                Err(e) => Ok(handle_error("Failed to calculate matches!", e))
+                Ok(r) => Ok(warp::reply::json(&r)),
+                Err(e) => Err(warp::reject::custom(e))
             }
         }
-        Err(e) => Ok(handle_error("Failed to find proposal!", e))
+        Err(e) => Err(warp::reject::custom(Error::DatabaseError(e)))
     }
 }
 
-async fn find_matches(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposal, query: Option<String>) -> Result<Vec<ProposalMatch>, SoundbaseError> {
+async fn find_matches(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposal, query: Option<String>) -> Result<Vec<ProposalMatch>> {
     let spotify_search_string = match query {
         Some(q) => q,
         None => build_spotify_query(&proposal)
@@ -152,7 +148,7 @@ async fn find_matches(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposal
     }
 }
 
-async fn confirm_match(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposal, matched: UniversalId) -> Result<(), SoundbaseError> {
+async fn confirm_match(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposal, matched: UniversalId) -> Result<()> {
     let track_id = match matched {
         UniversalId::Spotify(spot_id) => {
             //Not known to DB yet
@@ -168,7 +164,7 @@ async fn confirm_match(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposa
     Ok(())
 }
 
-fn discard_proposal_and_unfav_track(db: &DbApi, proposal: TrackFavProposal) -> Result<(), SoundbaseError> {
+fn discard_proposal_and_unfav_track(db: &DbApi, proposal: TrackFavProposal) -> Result<()> {
     if let Some(track_id) = proposal.track_id {
         db.set_faved_state(track_id, false)?;
     }
@@ -249,7 +245,7 @@ fn try_find_spotify_id_on_db<DB>(db: &DB, prop_match: ProposalMatch) -> Proposal
     }
 }
 
-async fn insert_track_from_spotify_id(db: &DbApi, spotify: &SpotifyApi, spot_id: &str) -> Result<Track, SoundbaseError> {
+async fn insert_track_from_spotify_id(db: &DbApi, spotify: &SpotifyApi, spot_id: &str) -> Result<Track> {
     let spotify_track = spotify.get_track(spot_id).await?;
     let spotify_album = spotify.get_album(&spotify_track.album.id.unwrap()).await?;
 
@@ -324,7 +320,7 @@ async fn insert_track_from_spotify_id(db: &DbApi, spotify: &SpotifyApi, spot_id:
     Ok(db_track)
 }
 
-fn find_or_insert_artist<DB>(db: &DB, artist: &FullArtist) -> Result<Artist, SoundbaseError>
+fn find_or_insert_artist<DB>(db: &DB, artist: &FullArtist) -> Result<Artist>
     where DB: ArtistDb {
     let id = UniversalId::Spotify(artist.id.to_string());
     let db_artist = match db.find_artist_by_universal_id(&id)? {

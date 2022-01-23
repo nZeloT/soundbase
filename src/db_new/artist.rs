@@ -17,13 +17,12 @@
 use diesel::prelude::*;
 
 use crate::db_new::{DbApi, DbPool, Result};
-use crate::db_new::db_error::DbError;
-use crate::db_new::{FindByFavedStatus, FindById, UpdateSingle};
+use crate::db_new::{FindByFavedStatus, FindById};
 use crate::db_new::models::{Artist, NewArtist};
 use crate::db_new::schema::*;
 use crate::model::UniversalId;
 
-pub trait ArtistDb: FindById<Artist> + FindByFavedStatus<Artist> + UpdateSingle<Artist> {
+pub trait ArtistDb: FindById<Artist> + FindByFavedStatus<Artist> {
     fn new_artist(&self, name: &str, spot_id: Option<String>) -> Result<Artist>;
     fn new_full_artist(&self, new_artist: NewArtist) -> Result<Artist>;
     fn find_artist_by_name(&self, name: &str) -> Result<Option<Artist>>;
@@ -39,53 +38,32 @@ impl ArtistDb for DbApi {
     }
 
     fn new_full_artist(&self, new_artist: NewArtist) -> Result<Artist> {
-        match self.0.get() {
-            Ok(conn) => {
-                let result = diesel::insert_into(artists::table)
-                    .values(&new_artist)
-                    .get_result(&conn);
-                match result {
-                    Ok(value) => Ok(value),
-                    Err(e) => Err(DbError::from(e))
-                }
-            }
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = diesel::insert_into(artists::table)
+            .values(&new_artist)
+            .get_result(&conn);
+        Ok(result?)
     }
 
 
     fn find_artist_by_name(&self, name: &str) -> Result<Option<Artist>> {
-        match self.0.get() {
-            Ok(conn) => {
-                let result = artists::table
-                    .filter(artists::name.eq(name))
-                    .first(&conn)
-                    .optional();
-                match result {
-                    Ok(v) => Ok(v),
-                    Err(e) => Err(DbError::from(e))
-                }
-            }
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = artists::table
+            .filter(artists::name.eq(name))
+            .first(&conn)
+            .optional();
+        Ok(result?)
     }
 
     fn find_artist_by_universal_id(&self, id: &UniversalId) -> Result<Option<Artist>> {
         match id {
             UniversalId::Spotify(spot_id) => {
-                match self.0.get() {
-                    Ok(conn) => {
-                        let result = artists::table
-                            .filter(artists::spot_id.like(spot_id))
-                            .first(&conn)
-                            .optional();
-                        match result {
-                            Ok(v) => Ok(v),
-                            Err(e) => Err(DbError::from(e))
-                        }
-                    },
-                    Err(_) => Err(DbError::pool_timeout())
-                }
+                let conn = self.0.get()?;
+                let result = artists::table
+                    .filter(artists::spot_id.like(spot_id))
+                    .first(&conn)
+                    .optional();
+                Ok(result?)
             },
             UniversalId::Database(artist_id) => Ok(Some(self.find_by_id(*artist_id)?))
         }
@@ -95,18 +73,11 @@ impl ArtistDb for DbApi {
 impl FindById<Artist> for DbApi {
     fn find_by_id(&self, id: i32) -> Result<Artist> {
         use crate::db_new::schema::artists::dsl::*;
-        match self.0.get() {
-            Ok(conn) => {
-                let result = artists
-                    .find(id)
-                    .first(&conn);
-                match result {
-                    Ok(value) => Ok(value),
-                    Err(e) => Err(DbError::from(e))
-                }
-            }
-            Err(_) => Err(DbError::pool_timeout())
-        }
+        let conn = self.0.get()?;
+        let result = artists
+            .find(id)
+            .first(&conn);
+        Ok(result?)
     }
 }
 
@@ -120,39 +91,13 @@ impl FindByFavedStatus<Artist> for DbApi {
     }
 }
 
-impl UpdateSingle<Artist> for DbApi {
-    fn update(&self, to_update: &Artist) -> Result<()> {
-        use crate::db_new::schema::artists::dsl::*;
-        match self.0.get() {
-            Ok(conn) => {
-                let result = diesel::update(artists)
-                    .set(to_update)
-                    .execute(&conn);
-                match result {
-                    Ok(_) => Ok(()),
-                    Err(e) => Err(DbError::from(e))
-                }
-            }
-            Err(_) => Err(DbError::pool_timeout())
-        }
-    }
-}
-
 fn _find_by_fav_status(pool: &DbPool, faved: bool, offset: i64, limit: i64) -> Result<Vec<Artist>> {
     use crate::db_new::schema::artists::dsl::*;
-    match pool.get() {
-        Ok(conn) => {
-            let results = artists
-                .filter(is_faved.eq(faved))
-                .limit(limit)
-                .offset(offset)
-                .load::<Artist>(&conn);
-
-            match results {
-                Ok(values) => Ok(values),
-                Err(e) => Err(DbError::from(e))
-            }
-        }
-        Err(_) => Err(DbError::pool_timeout())
-    }
+    let conn = pool.get()?;
+    let results = artists
+        .filter(is_faved.eq(faved))
+        .limit(limit)
+        .offset(offset)
+        .load::<Artist>(&conn);
+    Ok(results?)
 }

@@ -14,127 +14,97 @@
  * limitations under the License.
  */
 
-use std::string::FromUtf8Error;
-use std::num::ParseIntError;
+use std::convert::Infallible;
+use http::StatusCode;
+use serde::Serialize;
+use thiserror::Error;
 
-pub type Result<T, E = SoundbaseError> = core::result::Result<T, E>;
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("spotify client error: {0}")]
+    SpotifyError(#[from] rspotify::ClientError),
 
-#[derive(Debug)]
-pub struct SoundbaseError {
-    pub http_code: http::StatusCode,
-    pub msg: String,
+    #[error("spotify id error: {0}")]
+    SpotifyIdError(#[from] rspotify::model::IdError),
+
+    #[error("spotify model error: {0}")]
+    SpotifyModelError(#[from] rspotify::model::ModelError),
+
+    #[error("database error: {0}")]
+    DatabaseError(#[from] super::db_new::DbError),
+
+    #[error("api error: {0}")]
+    ApiError(String),
+
+    #[error("client request error: {0}")]
+    RequestError(String),
+
+    #[error("internal error: {0}")]
+    InternalError(String),
+
+    #[error("regex error: {0}")]
+    RegexError(#[from] regex::Error),
+
+    #[error("Serde error: {0}")]
+    SerdeError(#[from] serde_json::Error),
+
+    #[error("Int parse error: {0}")]
+    ParseError(#[from] std::num::ParseIntError),
+
+    #[error("Chrono parse error: {0}")]
+    ChronoParseError(#[from] chrono::ParseError),
+
+    #[error("input/output error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("Utf8 parse error: {0}")]
+    Utf8Error(#[from] std::string::FromUtf8Error),
+
+    #[error("Reqwest error: {0}")]
+    RequwestError(#[from] reqwest::Error)
 }
 
-impl SoundbaseError {
-    pub fn new(msg: &'static str) -> Self {
-        SoundbaseError {
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: msg.to_string()
+#[derive(Serialize, Debug)]
+pub struct ErrorResponse {
+    pub status: String,
+    pub kind : String,
+    pub message: String,
+}
+
+impl warp::reject::Reject for Error {}
+
+pub async fn handle_rejection(err : warp::Rejection) -> std::result::Result<impl warp::Reply, Infallible> {
+    let (code, kind, message) = if err.is_not_found() {
+        (StatusCode::NOT_FOUND, "404".to_string(), "not found".to_string())
+    }else if let Some(e) = err.find::<Error>() {
+        match e {
+            Error::SpotifyError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "Spotify".to_string(), n.to_string()),
+            Error::SpotifyIdError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "Spotify".to_string(), n.to_string()),
+            Error::SpotifyModelError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "Spotify".to_string(), n.to_string()),
+            Error::ApiError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "API".to_string(), n.clone()),
+            Error::RequestError(n) => (StatusCode::BAD_REQUEST, "Client".to_string(), n.clone()),
+            Error::InternalError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal".to_string(), n.clone()),
+            Error::DatabaseError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "Database".to_string(), n.to_string()),
+            Error::RegexError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "Regex".to_string(), n.to_string()),
+            Error::SerdeError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "Serde".to_string(), n.to_string()),
+            Error::ParseError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "Parse".to_string(), n.to_string()),
+            Error::ChronoParseError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "Chrono Parse".to_string(), n.to_string()),
+            Error::IoError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "IO".to_string(), n.to_string()),
+            Error::Utf8Error(n) => (StatusCode::INTERNAL_SERVER_ERROR, "Utf8 Parse".to_string(), n.to_string()),
+            Error::RequwestError(n) => (StatusCode::INTERNAL_SERVER_ERROR, "Requwest".to_string(), n.to_string())
         }
-    }
-}
+    }else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
+        (StatusCode::METHOD_NOT_ALLOWED, "HTTP".to_string(), "Method not allowed!".to_string())
+    }else{
+        eprintln!("unhandled error {:?}", err);
+        (StatusCode::INTERNAL_SERVER_ERROR, "Unknown".to_string(), "Internal Server Error".to_string())
+    };
 
-impl warp::Reply for SoundbaseError {
-    fn into_response(self) -> warp::reply::Response {
-        warp::reply::with_status(self.msg, self.http_code).into_response()
-    }
-}
+    let json = warp::reply::json(&ErrorResponse{
+        status: code.to_string(),
+        kind,
+        message
+    });
 
-impl From<diesel::r2d2::Error> for SoundbaseError {
-    fn from(e: diesel::r2d2::Error) -> SoundbaseError {
-        SoundbaseError {
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string(),
-        }
-    }
-}
-
-impl From<regex::Error> for SoundbaseError {
-    fn from(e: regex::Error) -> Self {
-        SoundbaseError{
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string()
-        }
-    }
-}
-
-impl From<std::io::Error> for SoundbaseError {
-    fn from(e: std::io::Error) -> Self {
-        SoundbaseError {
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string()
-        }
-    }
-}
-
-impl From<serde_json::Error> for SoundbaseError {
-    fn from(e: serde_json::Error) -> Self {
-        SoundbaseError{
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string()
-        }
-    }
-}
-
-impl From<reqwest::Error> for SoundbaseError {
-    fn from(e: reqwest::Error) -> Self {
-        SoundbaseError {
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string()
-        }
-    }
-}
-
-impl From<chrono::ParseError> for SoundbaseError {
-    fn from(e: chrono::ParseError) -> Self {
-        SoundbaseError {
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string()
-        }
-    }
-}
-
-impl From<FromUtf8Error> for SoundbaseError {
-    fn from(e: FromUtf8Error) -> Self {
-        SoundbaseError {
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string()
-        }
-    }
-}
-
-impl From<ParseIntError> for SoundbaseError {
-    fn from(e: ParseIntError) -> Self {
-        SoundbaseError{
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string()
-        }
-    }
-}
-
-impl From<rspotify::ClientError> for SoundbaseError {
-    fn from(e: rspotify::ClientError) -> Self {
-        SoundbaseError{
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string()
-        }
-    }
-}
-
-impl From<rspotify::model::IdError> for SoundbaseError {
-    fn from(e: rspotify::model::IdError) -> Self {
-        SoundbaseError{
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string()
-        }
-    }
-}
-
-impl From<rspotify::model::ModelError> for SoundbaseError {
-    fn from(e : rspotify::model::ModelError) -> Self {
-        SoundbaseError{
-            http_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-            msg: e.to_string()
-        }
-    }
+    Ok(warp::reply::with_status(json, code))
 }

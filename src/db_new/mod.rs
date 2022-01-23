@@ -17,6 +17,7 @@
 use diesel::pg::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use diesel::r2d2::Pool;
+use thiserror::Error;
 use url::Url;
 
 use crate::db_new::album::AlbumDb;
@@ -25,7 +26,6 @@ use crate::db_new::artist::ArtistDb;
 use crate::db_new::models::{Album, Artist, NewAlbum, NewArtist, NewTrack, Track};
 use crate::db_new::track::TrackDb;
 
-pub mod db_error;
 mod schema;
 pub mod models;
 pub mod genre;
@@ -41,7 +41,22 @@ pub mod track_fav_proposal;
 
 type DbPool = Pool<ConnectionManager<PgConnection>>;
 
-type Result<R> = std::result::Result<R, db_error::DbError>;
+type Result<R> = std::result::Result<R, DbError>;
+
+#[derive(Error, Debug)]
+pub enum DbError{
+    #[error("DB connection error: {0}")]
+    ConnectionError(#[from] r2d2::Error),
+
+    #[error("DB sql execution error: {0}")]
+    SqlError(#[from] diesel::result::Error),
+    
+    #[error("DB update failed: {0}")]
+    UpdateError(String),
+    
+    #[error("DB delete failed: {0}")]
+    DeleteError(String)
+}
 
 pub trait FindById<T> {
     fn find_by_id(&self, id: i32) -> Result<T>;

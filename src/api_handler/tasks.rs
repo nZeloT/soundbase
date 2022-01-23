@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
+use warp::Reply;
 use crate::db_new::DbApi;
-use crate::tasks;
-use super::reply;
+use crate::{tasks, WebResult};
 
-pub async fn fetch_charts(db: DbApi) -> Result<impl warp::Reply, std::convert::Infallible> {
+pub async fn fetch_charts(db: DbApi) -> WebResult<impl Reply> {
     tasks::launch_fetch_charts(&db);
-    Ok(reply(String::from(""), http::StatusCode::OK))
+    Ok(format!(""))
 }
 
-pub async fn fetch_albums_of_week(db: DbApi) -> Result<impl warp::Reply, std::convert::Infallible> {
+pub async fn fetch_albums_of_week(db: DbApi) -> WebResult<impl Reply> {
     tasks::launch_fetch_albums_of_week(&db);
-    Ok(reply(String::from(""), http::StatusCode::OK))
+    Ok(format!(""))
 }

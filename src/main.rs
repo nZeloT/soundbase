@@ -20,6 +20,7 @@ extern crate diesel;
 use std::env;
 use std::net::SocketAddr;
 use url::Url;
+use warp::Filter;
 
 use crate::spotify::SpotifyApi;
 
@@ -31,6 +32,9 @@ mod tasks;
 mod string_utils;
 mod db_new;
 mod spotify;
+
+type Result<T> = core::result::Result<T, error::Error>;
+type WebResult<T> = std::result::Result<T, warp::Rejection>;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() {
@@ -49,7 +53,7 @@ async fn main() {
     let api = filters::endpoints(
         db_api,
         spotify
-    );
+    ).recover(error::handle_rejection);
 
 
     let env_ip_str = match std::env::var("SERVER_IP") {
@@ -188,8 +192,6 @@ mod filters {
     //         .and(with_spotify(spotify))
     //         .and_then(handlers::spotify_start_auth)
     // }
-
-
 
     fn with_db(db: DbApi) -> impl Filter<Extract=(DbApi, ), Error=std::convert::Infallible> + Clone {
         warp::any().map(move || db.clone())

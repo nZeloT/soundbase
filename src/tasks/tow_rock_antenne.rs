@@ -22,8 +22,9 @@ use regex::Regex;
 
 use crate::db_new::DbApi;
 use crate::db_new::models::NewArtist;
-use crate::error::{Result, SoundbaseError};
+use crate::error::Error;
 use crate::string_utils::{UnifyApostrophes, UnifyQuotes};
+use crate::Result;
 
 use super::get_selector;
 
@@ -113,13 +114,13 @@ fn select_image_url(html: &str) -> Result<String> {
                         Some(url) => {
                             Ok(url.to_string())
                         }
-                        None => Err(SoundbaseError::new("Couldn't find URL in 'srcset' image attribute!"))
+                        None => Err(Error::InternalError("Couldn't find URL in 'srcset' image attribute!".to_string()))
                     }
                 }
-                None => Err(SoundbaseError::new("No attribute named 'srcset' found in image element!"))
+                None => Err(Error::InternalError("No attribute named 'srcset' found in image element!".to_string()))
             }
         }
-        None => Err(SoundbaseError::new("No Element found with image element selector!"))
+        None => Err(Error::InternalError("No Element found with image element selector!".to_string()))
     }
 }
 
@@ -135,7 +136,7 @@ fn execute_tesseract(stdin: Vec<u8>) -> Result<String> {
 
     {
         let child_in = child.stdin.as_mut()
-            .ok_or_else(|| SoundbaseError::new("Failed to get mutable stdin to tesseract child process!"))?;
+            .ok_or_else(|| Error::InternalError("Failed to get mutable stdin to tesseract child process!".to_string()))?;
         child_in.write_all(stdin.as_ref())?;
     }
     let output = child.wait_with_output()?;
@@ -143,7 +144,7 @@ fn execute_tesseract(stdin: Vec<u8>) -> Result<String> {
     println!("Executed tesseract!");
 
     if !output.status.success() {
-        return Err(SoundbaseError::new("Failed to run tesseract!"));
+        return Err(Error::InternalError("Failed to run tesseract!".to_string()));
     }
 
     Ok(String::from_utf8(output.stdout)?)

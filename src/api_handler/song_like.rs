@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
+use warp::Reply;
 use crate::db_new::DbApi;
 use crate::db_new::models::{NewTrackFavProposal, TrackFavProposal};
 use crate::db_new::track::TrackDb;
 use crate::db_new::track_fav_proposal::TrackFavProposalDb;
-use crate::error::SoundbaseError;
-use super::reply;
+use crate::error::Error;
 use crate::generated::song_like_protocol_generated as protocol;
+use crate::WebResult;
+use crate::Result;
 
 trait RawResolver {
     fn is_excluded(&self, raw: &str) -> bool;
@@ -29,19 +31,14 @@ trait RawResolver {
     fn artist(&self, raw: &str) -> String;
 }
 
-pub async fn handle_song_like_message(db: DbApi, body: bytes::Bytes) -> Result<impl warp::Reply, std::convert::Infallible> {
-    let resp = process_message(&db, body.to_vec());
-
-    match resp {
-        Ok(r) => Ok(reply(r, http::StatusCode::OK)),
-        Err(e) => {
-            println!("\tResponding with Error => {:?}", e.msg);
-            Ok(reply(e.msg.as_bytes().to_vec(), e.http_code))
-        }
+pub async fn handle_song_like_message(db: DbApi, body: bytes::Bytes) -> WebResult<impl Reply> {
+    match process_message(&db, body.to_vec()) {
+        Ok(r) => Ok(r),
+        Err(e) => Err(warp::reject::custom(e))
     }
 }
 
-fn process_message(db: &DbApi, buffer: Vec<u8>) -> Result<Vec<u8>, SoundbaseError>
+fn process_message(db: &DbApi, buffer: Vec<u8>) -> Result<Vec<u8>>
 {
     let msg = protocol::root_as_song_message(buffer.as_slice())
         .expect("Expected SongMessage. Got something else!");
@@ -77,7 +74,7 @@ fn process_message(db: &DbApi, buffer: Vec<u8>) -> Result<Vec<u8>, SoundbaseErro
                 //Match with fav proposal
                 process_info(proposal)?
             }
-            _ => return Err(SoundbaseError::new("Unknown Request Kind!")),
+            _ => return Err(Error::ApiError(format!("Received unknown song like message kind!"))),
         }
     };
 
@@ -85,7 +82,7 @@ fn process_message(db: &DbApi, buffer: Vec<u8>) -> Result<Vec<u8>, SoundbaseErro
     build_response_message(msg.id(), resp_kind)
 }
 
-fn process_fav<DB>(db: &DB, resolver : &Box<dyn RawResolver>, proposal : Option<TrackFavProposal>, source_name : &str, raw : &str) -> Result<protocol::ResponseKind, SoundbaseError>
+fn process_fav<DB>(db: &DB, resolver : &Box<dyn RawResolver>, proposal : Option<TrackFavProposal>, source_name : &str, raw : &str) -> Result<protocol::ResponseKind>
 where DB : TrackFavProposalDb {
     match proposal {
         Some(_) => Ok(protocol::ResponseKind::FOUND_NOW_FAVED),
@@ -97,7 +94,7 @@ where DB : TrackFavProposalDb {
     }
 }
 
-fn process_unfav<DB>(db: &DB, proposal : Option<TrackFavProposal>) -> Result<protocol::ResponseKind, SoundbaseError>
+fn process_unfav<DB>(db: &DB, proposal : Option<TrackFavProposal>) -> Result<protocol::ResponseKind>
     where DB: TrackDb + TrackFavProposalDb {
     match proposal {
         Some(p) => {
@@ -110,7 +107,7 @@ fn process_unfav<DB>(db: &DB, proposal : Option<TrackFavProposal>) -> Result<pro
     }
 }
 
-fn process_info(proposal : Option<TrackFavProposal>) -> Result<protocol::ResponseKind, SoundbaseError> {
+fn process_info(proposal : Option<TrackFavProposal>) -> Result<protocol::ResponseKind> {
     match proposal {
         Some(_) => Ok(protocol::ResponseKind::FOUND_FAVED),
         None => Ok(protocol::ResponseKind::FOUND_NOT_FAVED)
@@ -140,12 +137,12 @@ fn get_new_track_proposal(resolver : &Box<dyn RawResolver>, source_name : &str, 
     }
 }
 
-fn find_on_db<DB>(db: &DB, source_name : &str, pattern : &str) -> Result<Option<TrackFavProposal>, SoundbaseError>
+fn find_on_db<DB>(db: &DB, source_name : &str, pattern : &str) -> Result<Option<TrackFavProposal>>
     where DB: TrackFavProposalDb {
     Ok(db.find_by_source_and_raw_pattern(source_name, pattern)?)
 }
 
-fn set_track_to_unfaved<DB>(db: &DB, track_id: &Option<i32>) -> Result<(), SoundbaseError>
+fn set_track_to_unfaved<DB>(db: &DB, track_id: &Option<i32>) -> Result<()>
     where DB: TrackDb {
     match track_id {
         Some(id) => {
@@ -156,7 +153,7 @@ fn set_track_to_unfaved<DB>(db: &DB, track_id: &Option<i32>) -> Result<(), Sound
     }
 }
 
-fn build_response_message(msg_id: u64, response: protocol::ResponseKind) -> Result<Vec<u8>, SoundbaseError> {
+fn build_response_message(msg_id: u64, response: protocol::ResponseKind) -> Result<Vec<u8>> {
     let mut fbb = flatbuffers::FlatBufferBuilder::new();
 
     let mut res_builder = protocol::ResponseBuilder::new(&mut fbb);
