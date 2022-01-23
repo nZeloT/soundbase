@@ -207,14 +207,14 @@ fn select_reasoning_html(full_post: &scraper::Html) -> Result<String> {
     }
 }
 
-fn select_reasoning_text(full_post: &scraper::Html) -> Result<Vec<&str>> {
-    let reasoning_selector = get_selector("div.pagecontent > div.row > main > div > div.row > div.small-12.columns > div.clearfix + p + div + div.clearfix")?;
-    let possible_reasoning = full_post.select(&reasoning_selector).next();
-    match possible_reasoning {
-        Some(reasoning_el) => Ok(reasoning_el.text().collect::<Vec<_>>()),
-        None => Err(Error::InternalError("No Element found in reasoning element selector!".to_string()))
-    }
-}
+// fn select_reasoning_text(full_post: &scraper::Html) -> Result<Vec<&str>> {
+//     let reasoning_selector = get_selector("div.pagecontent > div.row > main > div > div.row > div.small-12.columns > div.clearfix + p + div + div.clearfix")?;
+//     let possible_reasoning = full_post.select(&reasoning_selector).next();
+//     match possible_reasoning {
+//         Some(reasoning_el) => Ok(reasoning_el.text().collect::<Vec<_>>()),
+//         None => Err(Error::InternalError("No Element found in reasoning element selector!".to_string()))
+//     }
+// }
 
 fn select_song_list(full_post: &scraper::Html) -> Result<String> {
     let song_list_selector = get_selector("div.pagecontent > div.row > main > div > div.row > div.small-12 > div.clearfix:nth-child(2)")?;

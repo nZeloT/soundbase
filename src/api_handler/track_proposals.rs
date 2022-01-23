@@ -52,7 +52,7 @@ struct TrackFavProposalListResponse {
 
 impl TrackFavProposalListResponse {
     pub fn new(data: Vec<TrackFavProposal>, page: &RequestPage) -> Self {
-        let page = ResponsePage::new("/api/v1/track-proposal/", page, data.len() == page.limit() as usize);
+        let page = ResponsePage::new("/api/v1/track-proposals/", page, data.len() == page.limit() as usize);
         Self {
             entries: data,
             page,

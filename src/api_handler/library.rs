@@ -17,9 +17,9 @@
 /***
 /api/v1/library/track?offset=&limit=
                       /<id>
-                      /
 /api/v1/library/album/?offset=&limit=
                       /<id>
+                      /tracks
 /api/v1/library/artist/?offset=&limit=
                        /<id>
  */

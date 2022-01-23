@@ -15,10 +15,11 @@
  */
 use diesel::prelude::*;
 
-use crate::db_new::{DbApi, DbError, Result};
+use crate::db_new::{DbApi, Result};
 use crate::db_new::FindById;
 use crate::db_new::models::{AlbumOfWeek, NewAlbumOfWeek};
 use crate::db_new::schema::*;
+use crate::model::RequestPage;
 
 pub trait AlbumOfWeekDb : FindById<AlbumOfWeek> {
     fn new_album_of_week(&self, new_aow : NewAlbumOfWeek) -> Result<AlbumOfWeek>;

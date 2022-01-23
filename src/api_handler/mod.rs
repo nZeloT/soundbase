@@ -16,8 +16,6 @@
 
 use std::collections::HashMap;
 
-use http::StatusCode;
-use serde::{Serialize};
 use warp::reply::Reply;
 
 use crate::{SpotifyApi, WebResult};
@@ -43,10 +41,10 @@ pub async fn spotify_auth_callback(api: SpotifyApi, params: HashMap<String, Stri
     match params.get("code") {
         Some(code) => {
             match api.finish_initialization_with_code(code).await {
-                Ok(_) => Ok(format!("Successful Spotify Authentication")),
+                Ok(_) => Ok("Successful Spotify Authentication".to_string()),
                 Err(e) => Err(warp::reject::custom(e))
             }
         }
-        None => Err(warp::reject::custom(Error::RequestError(format!("Couldn't parse query parameter 'code'!"))))
+        None => Err(warp::reject::custom(Error::RequestError("Couldn't parse query parameter 'code'!".to_string())))
     }
 }

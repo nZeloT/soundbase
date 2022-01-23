@@ -19,6 +19,7 @@ extern crate diesel;
 
 use std::env;
 use std::net::SocketAddr;
+
 use url::Url;
 use warp::Filter;
 
@@ -52,7 +53,7 @@ async fn main() {
 
     let api = filters::endpoints(
         db_api,
-        spotify
+        spotify,
     ).recover(error::handle_rejection);
 
 
@@ -83,57 +84,95 @@ mod filters {
         // dissects: Dissects,
         spotify: SpotifyApi,
     ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        song_fav_heartbeat()
-            .or(song_fav( db.clone()))
-            .or(task_api(db.clone()))
-            .or(track_proposal_api(db.clone(), spotify.clone()))
-            .or(library_api(db))
-            // .or(spotify_start_authorization(spotify.clone()))
-            .or(spotify_auth_callback(spotify))
-    }
+        let prefix = warp::path!("api" / "v1" / ..);
 
-    fn song_fav_heartbeat() -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("song_fav" / "heartbeat")
+        let list_ep = warp::path::end()
             .and(warp::get())
-            .and_then(api_handler::heartbeat)
-    }
-
-    fn song_fav(
-        db : DbApi
-    ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("song_fav")
-            .and(warp::post())
             .and(with_db(db.clone()))
+            .and(warp::query::<model::RequestPage>());
+        let single_ep = warp::path!(i32)
+            .and(warp::get())
+            .and(with_db(db.clone()));
+
+        let tracks = list_ep.clone()
+            .and_then(api_handler::library::load_tracks);
+        let single_track = single_ep.clone()
+            .and_then(api_handler::library::load_single_track);
+        let tracks_api = warp::path!("tracks" / ..)
+            .and(tracks.or(single_track));
+
+        let albums = list_ep.clone()
+            .and_then(api_handler::library::load_albums);
+        let single_album = single_ep.clone()
+            .and_then(api_handler::library::load_single_album);
+        let album_api = warp::path!("albums" / ..)
+            .and(albums.or(single_album));
+
+        let artists = list_ep.clone()
+            .and_then(api_handler::library::load_artists);
+        let single_artist = single_ep
+            .and_then(api_handler::library::load_single_artist);
+        let artist_api = warp::path!("artists" / ..)
+            .and(artists.or(single_artist));
+
+        let library_api = warp::path!("library" / ..)
+            .and(tracks_api.or(album_api).or(artist_api));
+
+        let proposals = list_ep
+            .and_then(api_handler::track_proposals::load_proposals);
+        let prop_matches = warp::path!(i32 / "matches")
+            .and(warp::get())
+            .and(warp::query::<api_handler::track_proposals::MatchesQuery>())
+            .and(with_db(db.clone()))
+            .and(with_spotify(spotify.clone()))
+            .and_then(api_handler::track_proposals::load_proposal_matches);
+        let prop_confirm = warp::path!(i32 / "confirm" / String)
+            .and(warp::get())
+            .and(with_db(db.clone()))
+            .and(with_spotify(spotify.clone()))
+            .and_then(api_handler::track_proposals::confirm_proposal);
+        let prop_discard = warp::path!(i32 / "discard")
+            .and(warp::get())
+            .and(with_db(db.clone()))
+            .and_then(api_handler::track_proposals::discard_proposal);
+        let track_proposal_api = warp::path!("track-proposals" / ..)
+            .and(proposals
+                .or(prop_matches)
+                .or(prop_confirm)
+                .or(prop_discard)
+            );
+
+        let album_of_week = warp::path!("albums-of-week")
+            .and(warp::get())
+            .and(with_db(db.clone()))
+            .and_then(api_handler::tasks::fetch_albums_of_week);
+        let charts = warp::path!("charts")
+            .and(warp::get())
+            .and(with_db(db.clone()))
+            .and_then(api_handler::tasks::fetch_charts);
+        let task_api = warp::path!("tasks" / ..)
+            .and(album_of_week.or(charts));
+
+        let song_like_proto = warp::path!("song-like-proto")
+            .and(warp::post())
+            .and(with_db(db))
             .and(warp::body::bytes())
-            .and_then(api_handler::song_like::handle_song_like_message)
-    }
+            .and_then(api_handler::song_like::handle_song_like_message);
 
-    fn task_api(
-        db : DbApi
-    ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        fetch_aow(db.clone())
-            // .or(fetch_tow(db))
-    }
+        let heartbeat = warp::path!("heartbeat")
+            .and(warp::get())
+            .and_then(api_handler::heartbeat);
 
-    fn track_proposal_api(
-        db : DbApi,
-        spotify : SpotifyApi
-    ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        track_proposal_load(db.clone())
-            .or(track_proposal_confirm(db.clone(), spotify.clone()))
-            .or(track_proposal_discard(db.clone()))
-            .or(track_proposal_matches(db, spotify))
-    }
-
-    fn library_api(
-        db : DbApi
-    ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        library_load_single_artist(db.clone())
-            .or(library_load_single_album(db.clone()))
-            .or(library_load_single_track(db.clone()))
-            .or(library_load_artists(db.clone()))
-            .or(library_load_albums(db.clone()))
-            .or(library_load_tracks(db.clone()))
+        spotify_auth_callback(spotify)
+            .or(
+                prefix.and(
+                    heartbeat
+                        .or(song_like_proto)
+                        .or(task_api)
+                        .or(library_api)
+                        .or(track_proposal_api)
+                )
+            )
     }
 
     fn spotify_auth_callback(
@@ -144,101 +183,6 @@ mod filters {
             .and(with_spotify(spotify))
             .and(warp::query::<HashMap<String, String>>())
             .and_then(api_handler::spotify_auth_callback)
-    }
-
-    fn fetch_tow(
-        db: DbApi
-    ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("fetch" / "Charts")
-            .and(warp::get())
-            .and(with_db(db))
-            .and_then(api_handler::tasks::fetch_charts)
-    }
-
-    fn fetch_aow(
-        db: DbApi
-    ) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("fetch" / "AlbumsOfWeek")
-            .and(warp::get())
-            .and(with_db(db))
-            .and_then(api_handler::tasks::fetch_albums_of_week)
-    }
-
-    fn track_proposal_load(db : DbApi) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "track-proposal" )
-            .and(warp::get())
-            .and(with_db(db))
-            .and(warp::query::<model::RequestPage>())
-            .and_then(api_handler::track_proposals::load_proposals)
-    }
-
-    fn track_proposal_confirm(db : DbApi, spotify : SpotifyApi) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "track-proposal" / i32 / "confirm" / String)
-            .and(warp::get())
-            .and(with_db(db))
-            .and(with_spotify(spotify))
-            .and_then(api_handler::track_proposals::confirm_proposal)
-    }
-
-    fn track_proposal_discard(db : DbApi) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "track-proposal" / i32 / "discard")
-            .and(warp::get())
-            .and(with_db(db))
-            .and_then(api_handler::track_proposals::discard_proposal)
-    }
-
-    fn track_proposal_matches(db : DbApi, spotify : SpotifyApi) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "track-proposal" / i32 / "matches")
-            .and(warp::get())
-            .and(warp::query::<api_handler::track_proposals::MatchesQuery>())
-            .and(with_db(db))
-            .and(with_spotify(spotify))
-            .and_then(api_handler::track_proposals::load_proposal_matches)
-    }
-
-    fn library_load_tracks(db : DbApi) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "library" / "track")
-            .and(warp::get())
-            .and(with_db(db))
-            .and(warp::query::<model::RequestPage>())
-            .and_then(api_handler::library::load_tracks)
-    }
-
-    fn library_load_albums(db : DbApi) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "library" / "album")
-            .and(warp::get())
-            .and(with_db(db))
-            .and(warp::query::<model::RequestPage>())
-            .and_then(api_handler::library::load_albums)
-    }
-
-    fn library_load_artists(db : DbApi) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "library" / "artist")
-            .and(warp::get())
-            .and(with_db(db))
-            .and(warp::query::<model::RequestPage>())
-            .and_then(api_handler::library::load_artists)
-    }
-
-    fn library_load_single_track(db : DbApi) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "library" / "track" / i32)
-            .and(warp::get())
-            .and(with_db(db))
-            .and_then(api_handler::library::load_single_track)
-    }
-
-    fn library_load_single_album(db : DbApi) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "library" / "album" / i32)
-            .and(warp::get())
-            .and(with_db(db))
-            .and_then(api_handler::library::load_single_album)
-    }
-
-    fn library_load_single_artist(db : DbApi) -> impl warp::Filter<Extract=impl warp::Reply, Error=warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "library" / "artist" / i32)
-            .and(warp::get())
-            .and(with_db(db))
-            .and_then(api_handler::library::load_single_artist)
     }
 
     // pub fn spotify_start_authorization(
