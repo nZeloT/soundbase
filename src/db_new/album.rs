@@ -20,7 +20,7 @@ use crate::db_new::{DbApi, DbPool, Result};
 use crate::db_new::{FindByFavedStatus, FindById};
 use crate::db_new::models::{Album, AlbumArtists, AlbumOfWeek, Artist, NewAlbum, Track};
 use crate::db_new::schema::*;
-use crate::model::UniversalId;
+use crate::model::{RequestPage, UniversalId};
 
 pub trait AlbumDb: FindById<Album> + FindByFavedStatus<Album> + Sync {
     fn new_album(&self, name: &str, year: i32, total_tracks: i32) -> Result<Album>;
@@ -29,6 +29,7 @@ pub trait AlbumDb: FindById<Album> + FindByFavedStatus<Album> + Sync {
     fn find_by_universal_id(&self, id : &UniversalId) -> Result<Option<Album>>;
     fn load_album_for_track(&self, track: &Track) -> Result<Album>;
     fn load_album_for_aow(&self, aow: &AlbumOfWeek) -> Result<Album>;
+    fn load_albums(&self, page : &RequestPage) -> Result<Vec<Album>>;
     fn set_was_aow(&self, album: &Album, was_aow: bool) -> Result<Album>;
 }
 
@@ -87,6 +88,15 @@ impl AlbumDb for DbApi {
 
     fn load_album_for_aow(&self, aow: &AlbumOfWeek) -> Result<Album> {
         self.find_by_id(aow.album_id)
+    }
+
+    fn load_albums(&self, page: &RequestPage) -> Result<Vec<Album>> {
+        let conn = self.0.get()?;
+        let results = albums::table
+            .offset(page.offset())
+            .limit(page.limit())
+            .load::<Album>(&conn);
+        Ok(results?)
     }
 
     fn set_was_aow(&self, album: &Album, was_aow: bool) -> Result<Album> {

@@ -19,13 +19,13 @@ use diesel::prelude::*;
 use crate::db_new::{DbApi, Result};
 use crate::db_new::models::{Track, Artist, TrackArtists, NewTrackArtists};
 use crate::db_new::schema::*;
-use crate::model::Page;
+use crate::model::RequestPage;
 
 pub trait TrackArtistsDb {
     fn new_track_artist(&self, track_id : i32, artist_id : i32) -> Result<TrackArtists>;
     fn new_track_artist_if_missing(&self, track_id : i32, artist_id : i32) -> Result<TrackArtists>;
-    fn load_track_for_artist(&self, artist: &Artist, page : Page) -> Result<Vec<Track>>;
-    fn load_artists_for_track(&self, track : &Track, page : Page) -> Result<Vec<Artist>>;
+    fn load_track_for_artist(&self, artist: &Artist, page : RequestPage) -> Result<Vec<Track>>;
+    fn load_artists_for_track(&self, track : &Track, page : RequestPage) -> Result<Vec<Artist>>;
 }
 
 impl TrackArtistsDb for DbApi {
@@ -54,7 +54,7 @@ impl TrackArtistsDb for DbApi {
         }
     }
     
-    fn load_track_for_artist(&self, artist: &Artist, page: Page) -> Result<Vec<Track>> {
+    fn load_track_for_artist(&self, artist: &Artist, page: RequestPage) -> Result<Vec<Track>> {
         use crate::db_new::schema::track_artist::dsl::*;
         use diesel::dsl::any;
 
@@ -68,7 +68,7 @@ impl TrackArtistsDb for DbApi {
         Ok(result?)
     }
 
-    fn load_artists_for_track(&self, track: &Track, page: Page) -> Result<Vec<Artist>> {
+    fn load_artists_for_track(&self, track: &Track, page: RequestPage) -> Result<Vec<Artist>> {
         use crate::db_new::schema::track_artist::dsl::*;
         use diesel::dsl::any;
 

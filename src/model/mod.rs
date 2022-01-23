@@ -33,31 +33,80 @@ impl From<&str> for UniversalId {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct Page {
-    pub offset: Option<i64>,
-    pub limit: Option<i64>,
+pub struct RequestPage {
+    offset: Option<i64>,
+    limit: Option<i64>,
 }
 
-impl Page {
+impl RequestPage {
     pub fn new(offset: i64, limit: i64) -> Self {
         Self {
-            offset: Some(offset),
-            limit: Some(limit),
+            offset: Some(Self::_offset(offset)),
+            limit: Some(Self::_limit(limit)),
         }
     }
 
     pub fn offset(&self) -> i64 {
         match self.offset {
-            Some(o) => if o < 0 { 0 } else { o },
+            Some(o) => Self::_offset(o),
             None => 0
         }
     }
 
     pub fn limit(&self) -> i64 {
         match self.limit {
-            Some(l) => if !(0..=50).contains(&l) { 50 } else { l },
+            Some(l) => Self::_limit(l),
             None => 50
         }
+    }
+
+    pub fn next(&self) -> Self {
+        Self::new(self.offset() + self.limit(), self.limit())
+    }
+
+    pub fn prev(&self) -> Self {
+        Self::new(self.offset() - self.limit(), self.limit())
+    }
+
+    fn _offset(offset: i64) -> i64 {
+        if offset < 0 { 0 } else { offset }
+    }
+
+    fn _limit(limit: i64) -> i64 {
+        if !(0..=50).contains(&limit) { 50 } else { limit }
+    }
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct ResponsePage {
+    offset: i32,
+    limit: i32,
+    next: Option<String>,
+    prev: Option<String>,
+}
+
+impl ResponsePage {
+    pub fn new(api: &str, page: &RequestPage, full_page: bool) -> Self {
+        let next = if full_page { Some(Self::_api_string(api, &page.next())) } else { None };
+        let prev = if page.offset() > 0 { Some(Self::_api_string(api, &page.prev())) } else { None };
+        Self {
+            offset: page.offset() as i32,
+            limit: page.limit() as i32,
+            next, prev,
+        }
+    }
+
+    fn _api_string(api: &str, page: &RequestPage) -> String {
+        let mut api = api.to_string();
+        if api.contains('?') {
+            api += "&offset=";
+        } else {
+            api += "?offset=";
+        }
+        api += &format!("{}", page.offset());
+        api += "&limit=";
+        api += &format!("{}", page.limit());
+        api
     }
 }
 
@@ -65,7 +114,7 @@ pub enum AlbumType {
     Single,
     Album,
     Compilation,
-    AppearsOn
+    AppearsOn,
 }
 
 impl From<i32> for AlbumType {

@@ -26,6 +26,7 @@ use crate::error::Error;
 pub mod tasks;
 pub mod track_proposals;
 pub mod song_like;
+pub mod library;
 
 pub async fn heartbeat() -> WebResult<impl Reply> {
     println!("Received a Heartbeat request.");
@@ -48,14 +49,4 @@ pub async fn spotify_auth_callback(api: SpotifyApi, params: HashMap<String, Stri
         }
         None => Err(warp::reject::custom(Error::RequestError(format!("Couldn't parse query parameter 'code'!"))))
     }
-}
-
-
-fn reply<T: warp::Reply>(r: T, status: StatusCode) -> impl warp::Reply {
-    warp::reply::with_status(r, status)
-}
-
-fn reply_json<T>(r : &T, status : StatusCode) -> impl warp::Reply
-where T : Serialize {
-    reply(warp::reply::json(r), status)
 }

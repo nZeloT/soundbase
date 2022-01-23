@@ -20,13 +20,14 @@ use crate::db_new::{DbApi, DbPool, Result};
 use crate::db_new::{FindByFavedStatus, FindById};
 use crate::db_new::models::{Artist, NewArtist};
 use crate::db_new::schema::*;
-use crate::model::UniversalId;
+use crate::model::{RequestPage, UniversalId};
 
 pub trait ArtistDb: FindById<Artist> + FindByFavedStatus<Artist> {
     fn new_artist(&self, name: &str, spot_id: Option<String>) -> Result<Artist>;
     fn new_full_artist(&self, new_artist: NewArtist) -> Result<Artist>;
     fn find_artist_by_name(&self, name: &str) -> Result<Option<Artist>>;
     fn find_artist_by_universal_id(&self, id : &UniversalId) -> Result<Option<Artist>>;
+    fn load_artists(&self, page : &RequestPage) -> Result<Vec<Artist>>;
 }
 
 impl ArtistDb for DbApi {
@@ -67,6 +68,12 @@ impl ArtistDb for DbApi {
             },
             UniversalId::Database(artist_id) => Ok(Some(self.find_by_id(*artist_id)?))
         }
+    }
+
+    fn load_artists(&self, page: &RequestPage) -> Result<Vec<Artist>> {
+        let conn = self.0.get()?;
+        let result = artists::table.offset(page.offset()).limit(page.limit()).load::<Artist>(&conn);
+        Ok(result?)
     }
 }
 

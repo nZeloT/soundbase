@@ -34,7 +34,7 @@ use crate::db_new::track::TrackDb;
 use crate::db_new::track_artist::TrackArtistsDb;
 use crate::db_new::track_fav_proposal::TrackFavProposalDb;
 use crate::error::Error;
-use crate::model::{AlbumType, Page, UniversalId};
+use crate::model::{AlbumType, RequestPage, ResponsePage, UniversalId};
 use crate::{SpotifyApi, WebResult, Result};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -42,19 +42,20 @@ pub struct MatchesQuery {
     pub search: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct TrackFavProposalList {
+#[derive(Serialize, Debug)]
+struct TrackFavProposalListResponse {
     pub entries: Vec<TrackFavProposal>,
 
     #[serde(flatten)]
-    pub page: Page,
+    pub page: ResponsePage,
 }
 
-impl TrackFavProposalList {
-    pub fn new(data: Vec<TrackFavProposal>, page: &Page) -> Self {
+impl TrackFavProposalListResponse {
+    pub fn new(data: Vec<TrackFavProposal>, page: &RequestPage) -> Self {
+        let page = ResponsePage::new("/api/v1/track-proposal/", page, data.len() == page.limit() as usize);
         Self {
             entries: data,
-            page: Page { offset: Some(page.offset()), limit: Some(page.limit()) },
+            page,
         }
     }
 }
@@ -69,12 +70,12 @@ struct ProposalMatch {
     pub confidence: f32,
 }
 
-pub async fn load_proposals(db: DbApi, page: Page) -> WebResult<impl Reply> {
+pub async fn load_proposals(db: DbApi, page: RequestPage) -> WebResult<impl Reply> {
     let api: &dyn TrackFavProposalDb = &db;
     let results = api.load_track_proposals(&page);
     match results {
         Ok(data) => {
-            Ok(warp::reply::json(&TrackFavProposalList::new(data, &page)))
+            Ok(warp::reply::json(&TrackFavProposalListResponse::new(data, &page)))
         }
         Err(e) => Err(warp::reject::custom(Error::DatabaseError(e)))
     }
@@ -133,7 +134,7 @@ async fn find_matches(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposal
 
     //TODO also search on DB; but fuzzy search requires some Indexing
 
-    let search_results = spotify.search(&*spotify_search_string, Page::new(0, 10)).await;
+    let search_results = spotify.search(&*spotify_search_string, RequestPage::new(0, 10)).await;
     match search_results {
         Ok(candidates) => {
             let mut matches = candidates.iter()
@@ -153,6 +154,7 @@ async fn confirm_match(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposa
         UniversalId::Spotify(spot_id) => {
             //Not known to DB yet
             let track = insert_track_from_spotify_id(&db, &spotify, &*spot_id).await?;
+            let _ = spotify.save_track(&*spot_id).await?;
             track.track_id
         }
         UniversalId::Database(track_id) => track_id

@@ -20,11 +20,11 @@ use crate::db_new::{DbApi, DbError, Result};
 use crate::db_new::FindById;
 use crate::db_new::models::{NewTrackFavProposal, TrackFavProposal};
 use crate::db_new::schema::*;
-use crate::model::Page;
+use crate::model::RequestPage;
 
 pub trait TrackFavProposalDb: FindById<TrackFavProposal> + Sync {
     fn new_track_proposal(&self, new_proposal: NewTrackFavProposal) -> Result<TrackFavProposal>;
-    fn load_track_proposals(&self, page : &Page) -> Result<Vec<TrackFavProposal>>;
+    fn load_track_proposals(&self, page : &RequestPage) -> Result<Vec<TrackFavProposal>>;
     fn find_by_source_and_raw_pattern(&self, source: &str, pattern: &str) -> Result<Option<TrackFavProposal>>;
     fn link_to_track(&self, id: i32, track_id: i32) -> Result<()>;
     fn delete_track_proposal(&self, id: i32) -> Result<()>;
@@ -39,7 +39,7 @@ impl TrackFavProposalDb for DbApi {
         Ok(result?)
     }
 
-    fn load_track_proposals(&self, page : &Page) -> Result<Vec<TrackFavProposal>> {
+    fn load_track_proposals(&self, page : &RequestPage) -> Result<Vec<TrackFavProposal>> {
         let conn = self.0.get()?;
         let results = track_fav_proposals::table
             .filter(track_fav_proposals::track_id.is_null())

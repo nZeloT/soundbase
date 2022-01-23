@@ -25,7 +25,7 @@ use rspotify::model::{Market, SearchType, TrackId};
 use tokio::sync::RwLock;
 
 use crate::error::Error;
-use crate::model::Page;
+use crate::model::RequestPage;
 use crate::Result;
 
 #[derive(Clone)]
@@ -36,7 +36,7 @@ impl SpotifyApi {
         Ok(SpotifyApi(Arc::new(RwLock::new(SpotifyApi::_init().await?))))
     }
 
-    pub async fn search(&self, query: &str, page: Page) -> Result<Vec<FullTrack>> {
+    pub async fn search(&self, query: &str, page: RequestPage) -> Result<Vec<FullTrack>> {
         let client = self.0.read().await;
         match client.search(query,
                             &SearchType::Track,

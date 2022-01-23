@@ -31,7 +31,7 @@ pub struct NewGenre<'a> {
     pub name : &'a str
 }
 
-#[derive(Queryable, Identifiable, Associations, AsChangeset, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, Associations, AsChangeset, Serialize, PartialEq, Debug)]
 #[table_name = "artists"]
 #[primary_key(artist_id)]
 #[changeset_options(treat_none_as_null = "true")]
@@ -67,7 +67,7 @@ pub struct NewArtistGenre {
     pub genre_id : i32
 }
 
-#[derive(Queryable, Identifiable, Associations, AsChangeset, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, Associations, AsChangeset, Serialize, PartialEq, Debug)]
 #[table_name = "albums"]
 #[primary_key(album_id)]
 #[changeset_options(treat_none_as_null = "true")]
@@ -140,7 +140,7 @@ pub struct NewAlbumOfWeek<'a> {
     pub track_list_raw : Option<String>
 }
 
-#[derive(Queryable, Identifiable, Associations, AsChangeset, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, Associations, AsChangeset, Serialize, PartialEq, Debug)]
 #[belongs_to(Album)]
 #[table_name = "tracks"]
 #[primary_key(track_id)]

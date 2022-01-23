@@ -19,7 +19,7 @@ use crate::db_new::{DbApi, DbError, DbPool, Result};
 use crate::db_new::{FindByFavedStatus, FindById};
 use crate::db_new::models::{Track, NewTrack, Album};
 use crate::db_new::schema::*;
-use crate::model::UniversalId;
+use crate::model::{RequestPage, UniversalId};
 
 pub trait TrackDb: FindById<Track> + FindByFavedStatus<Track> + Sync {
     fn new_track(&self, title: &str, album_id: i32, duration_ms: i32, is_faved: bool) -> Result<Track>;
@@ -27,6 +27,7 @@ pub trait TrackDb: FindById<Track> + FindByFavedStatus<Track> + Sync {
     fn find_track_by_album(&self, album : &Album, name : &str) -> Result<Option<Track>>;
     fn find_track_by_universal_id(&self, uni_id : &UniversalId) -> Result<Option<Track>>;
     fn load_tracks_for_album(&self, album : &Album) -> Result<Vec<Track>>;
+    fn load_tracks(&self, page : &RequestPage) -> Result<Vec<Track>>;
     fn set_faved_state(&self, track_id : i32, now_faved : bool) -> Result<()>;
 }
 
@@ -79,6 +80,15 @@ impl TrackDb for DbApi {
     fn load_tracks_for_album(&self, album: &Album) -> Result<Vec<Track>> {
         let conn = self.0.get()?;
         let result = Track::belonging_to(album)
+            .load::<Track>(&conn);
+        Ok(result?)
+    }
+
+    fn load_tracks(&self, page : &RequestPage) -> Result<Vec<Track>> {
+        let conn = self.0.get()?;
+        let result = tracks::table
+            .offset(page.offset())
+            .limit(page.limit())
             .load::<Track>(&conn);
         Ok(result?)
     }
