@@ -14,6 +14,8 @@ table! {
         year -> Int4,
         total_tracks -> Nullable<Int4>,
         is_faved -> Bool,
+        is_known_spot -> Bool,
+        is_known_local -> Bool,
         was_aow -> Bool,
         spot_id -> Nullable<Varchar>,
     }
@@ -45,6 +47,8 @@ table! {
         artist_id -> Int4,
         name -> Varchar,
         is_faved -> Bool,
+        is_known_spot -> Bool,
+        is_known_local -> Bool,
         spot_id -> Nullable<Varchar>,
     }
 }
@@ -94,7 +98,7 @@ table! {
         album_id -> Int4,
         disc_number -> Nullable<Int4>,
         track_number -> Nullable<Int4>,
-        duration_ms -> Int4,
+        duration_ms -> Int8,
         is_faved -> Bool,
         local_file -> Nullable<Varchar>,
         spot_id -> Nullable<Varchar>,

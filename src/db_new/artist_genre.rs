@@ -23,7 +23,7 @@ use crate::db_new::schema::*;
 pub trait ArtistGenreDb: Sync {
     fn new_artist_genre(&self, artist_id: i32, genre_id: i32) -> Result<ArtistGenre>;
     fn load_artists_for_genre(&self, genre: &Genre, offset: i64, limit: i64) -> Result<Vec<Artist>>;
-    fn load_genres_for_artist(&self, artist: &Artist, offset: i64, limit: i64) -> Result<Vec<Genre>>;
+    fn load_genres_for_artist(&self, artist: &Artist) -> Result<Vec<Genre>>;
 }
 
 impl ArtistGenreDb for DbApi {
@@ -52,7 +52,7 @@ impl ArtistGenreDb for DbApi {
         Ok(result?)
     }
 
-    fn load_genres_for_artist(&self, artist: &Artist, offset: i64, limit: i64) -> Result<Vec<Genre>> {
+    fn load_genres_for_artist(&self, artist: &Artist) -> Result<Vec<Genre>> {
         use crate::db_new::schema::artist_genre::dsl::*;
         use diesel::dsl::any;
 
@@ -60,8 +60,6 @@ impl ArtistGenreDb for DbApi {
         let genre_artist_ids = ArtistGenre::belonging_to(artist).select(genre_id);
         let result = genre::table
             .filter(genre::genre_id.eq(any(genre_artist_ids)))
-            .limit(limit)
-            .offset(offset)
             .load::<Genre>(&conn);
         Ok(result?)
     }

@@ -24,76 +24,24 @@
                        /<id>
  */
 
-use serde::Serialize;
 use warp::Reply;
+
 use crate::db_new::album::AlbumDb;
+use crate::db_new::album_artist::AlbumArtistsDb;
 use crate::db_new::artist::ArtistDb;
+use crate::db_new::artist_genre::ArtistGenreDb;
 use crate::db_new::DbApi;
 use crate::db_new::models::{Album, Artist, Track};
 use crate::db_new::track::TrackDb;
 use crate::error::Error;
-use crate::model::{RequestPage, ResponsePage};
+use crate::model::RequestPage;
 use crate::WebResult;
-
-#[derive(Serialize, Debug)]
-struct TrackListResponse {
-    entries: Vec<Track>,
-
-    #[serde(flatten)]
-    page: ResponsePage,
-}
-
-impl TrackListResponse {
-    pub fn new(data: Vec<Track>, page: &RequestPage) -> Self {
-        let page = ResponsePage::new("/api/v1/library/track/", &page, data.len() == page.limit() as usize);
-        Self {
-            entries: data,
-            page,
-        }
-    }
-}
-
-#[derive(Serialize, Debug)]
-struct AlbumsListResponse {
-    entries : Vec<Album>,
-
-    #[serde(flatten)]
-    page : ResponsePage
-}
-
-impl AlbumsListResponse {
-    pub fn new(data : Vec<Album>, page : &RequestPage) -> Self {
-        let page = ResponsePage::new("/api/v1/library/album/", &page, data.len() == page.limit() as usize);
-        Self {
-            entries: data,
-            page,
-        }
-    }
-}
-
-#[derive(Serialize, Debug)]
-struct ArtistListResponse {
-    entries: Vec<Artist>,
-
-    #[serde(flatten)]
-    page : ResponsePage
-}
-
-impl ArtistListResponse {
-    pub fn new(data : Vec<Artist>, page : &RequestPage) -> Self {
-        let page = ResponsePage::new("/api/v1/library/artist/", &page, data.len() == page.limit() as usize);
-        Self{
-            entries: data,
-            page,
-        }
-    }
-}
 
 pub async fn load_tracks(db: DbApi, page: RequestPage) -> WebResult<impl Reply> {
     let api: &dyn TrackDb = &db;
     let results = api.load_tracks(&page);
     match results {
-        Ok(data) => Ok(warp::reply::json(&TrackListResponse::new(data, &page))),
+        Ok(data) => Ok(warp::reply::json(&library_models::TrackListResponse::new(data, &page))),
         Err(e) => Err(warp::reject::custom(Error::DatabaseError(e)))
     }
 }
@@ -111,7 +59,7 @@ pub async fn load_albums(db : DbApi, page : RequestPage) -> WebResult<impl Reply
     let api : &dyn AlbumDb = &db;
     let result = api.load_albums(&page);
     match result {
-        Ok(data) => Ok(warp::reply::json(&AlbumsListResponse::new(data, &page))),
+        Ok(data) => Ok(warp::reply::json(&library_models::AlbumsListResponse::new(data, &page))),
         Err(e) => Err(warp::reject::custom(Error::DatabaseError(e)))
     }
 }
@@ -119,7 +67,21 @@ pub async fn load_albums(db : DbApi, page : RequestPage) -> WebResult<impl Reply
 pub async fn load_single_album(album_id : i32, db : DbApi) -> WebResult<impl Reply> {
     let api : &dyn AlbumDb = &db;
     match api.find_by_id(album_id) {
-        Ok(album) => Ok(warp::reply::json(&album)),
+        Ok(album) => {
+            let api : &dyn TrackDb = &db;
+            let tracks = match api.load_tracks_for_album(&album) {
+                Ok(tracks) => tracks,
+                Err(e) => return Err(warp::reject::custom(Error::DatabaseError(e)))
+            };
+            let api : &dyn AlbumArtistsDb = &db;
+            let artists = match api.load_artists_for_album(&album) {
+                Ok(artists) => artists,
+                Err(e)  => return Err(warp::reject::custom(Error::DatabaseError(e)))
+            };
+            let full_album = library_models::FullAlbum::new(album, tracks, artists);
+
+            Ok(warp::reply::json(&full_album))
+        },
         Err(e) => Err(warp::reject::custom(Error::DatabaseError(e)))
     }
 }
@@ -127,7 +89,7 @@ pub async fn load_single_album(album_id : i32, db : DbApi) -> WebResult<impl Rep
 pub async fn load_artists(db : DbApi, page : RequestPage) -> WebResult<impl Reply> {
     let api : &dyn ArtistDb = &db;
     match api.load_artists(&page) {
-        Ok(data) => Ok(warp::reply::json(&ArtistListResponse::new(data, &page))),
+        Ok(data) => Ok(warp::reply::json(&library_models::ArtistListResponse::new(data, &page))),
         Err(e) => Err(warp::reject::custom(Error::DatabaseError(e)))
     }
 }
@@ -135,7 +97,181 @@ pub async fn load_artists(db : DbApi, page : RequestPage) -> WebResult<impl Repl
 pub async fn load_single_artist(artist_id : i32, db : DbApi) -> WebResult<impl Reply> {
     let api : &dyn ArtistDb = &db;
     match api.find_by_id(artist_id) {
-        Ok(artist) => Ok(warp::reply::json(&artist)),
+        Ok(artist) => {
+            let api : &dyn TrackDb = &db;
+            let tracks = match api.load_fav_tracks_for_artist(&artist, &RequestPage::new(0, 10)) {
+                Ok(t) => t,
+                Err(e) => return Err(warp::reject::custom(Error::DatabaseError(e)))
+            };
+
+            let api : &dyn ArtistGenreDb = &db;
+            let genres = match api.load_genres_for_artist(&artist) {
+                Ok(g) => g,
+                Err(e) => return Err(warp::reject::custom(Error::DatabaseError(e)))
+            };
+
+            let api : &dyn AlbumArtistsDb = &db;
+            let albums = match api.load_albums_for_artist(&artist) {
+                Ok(a) => a,
+                Err(e) => return Err(warp::reject::custom(Error::DatabaseError(e)))
+            };
+            let full_artist = library_models::FullArtist::new(artist, genres, albums, tracks);
+            Ok(warp::reply::json(&full_artist))
+        },
         Err(e) => Err(warp::reject::custom(Error::DatabaseError(e)))
+    }
+}
+
+mod library_models {
+    use serde::Serialize;
+
+    use crate::db_new::models;
+    use crate::model::{RequestPage, ResponsePage};
+
+    #[derive(Serialize, Debug)]
+    pub struct TrackListResponse {
+        entries: Vec<models::Track>,
+
+        #[serde(flatten)]
+        page: ResponsePage,
+    }
+
+    impl TrackListResponse {
+        pub fn new(data: Vec<models::Track>, page: &RequestPage) -> Self {
+            let page = ResponsePage::new("/api/v1/library/track/", &page, data.len() == page.limit() as usize);
+            Self {
+                entries: data,
+                page,
+            }
+        }
+    }
+
+    #[derive(Serialize, Debug)]
+    pub struct FlatAlbum {
+        id : i32,
+        name : String,
+        year : i32,
+        is_faved : bool,
+        is_known_spot : bool,
+        is_known_local : bool
+    }
+
+    #[derive(Serialize, Debug)]
+    pub struct AlbumsListResponse {
+        entries : Vec<FlatAlbum>,
+
+        #[serde(flatten)]
+        page : ResponsePage
+    }
+
+    impl AlbumsListResponse {
+        pub fn new(data : impl IntoIterator<Item=impl Into<FlatAlbum>>, page : &RequestPage) -> Self {
+            let entries : Vec<FlatAlbum> = data.into_iter().map(|e|e.into()).collect();
+            let page = ResponsePage::new("/api/v1/library/album/", &page, entries.len() == page.limit() as usize);
+            Self {
+                entries,
+                page,
+            }
+        }
+    }
+
+    impl From<models::Album> for FlatAlbum {
+        fn from(source : models::Album) -> Self {
+            Self {
+                id: source.album_id,
+                name: source.name,
+                year: source.year,
+                is_faved: source.is_faved,
+                is_known_local: source.is_known_local,
+                is_known_spot: source.is_known_spot
+            }
+        }
+    }
+
+    #[derive(Serialize, Debug)]
+    pub struct FullAlbum {
+        #[serde(flatten)]
+        flat : FlatAlbum,
+
+        was_aow : bool,
+        tracks : Vec<models::Track>,
+        artists : Vec<FlatArtist>
+    }
+
+    impl FullAlbum {
+        pub fn new(album : models::Album,
+                   tracks : impl IntoIterator<Item=impl Into<models::Track>>,
+                   artists : impl IntoIterator<Item=impl Into<FlatArtist>>) -> Self {
+            Self {
+                flat: album.clone().into(),
+                was_aow: album.was_aow,
+                tracks: tracks.into_iter().map(|e|e.into()).collect(),
+                artists: artists.into_iter().map(|e|e.into()).collect(),
+            }
+        }
+    }
+
+    #[derive(Serialize, Debug)]
+    pub struct FlatArtist {
+        id : i32,
+        name : String,
+        is_known_local : bool,
+        is_known_spot : bool,
+        is_faved : bool,
+    }
+
+    #[derive(Serialize, Debug)]
+    pub struct ArtistListResponse {
+        entries: Vec<FlatArtist>,
+
+        #[serde(flatten)]
+        page : ResponsePage
+    }
+
+    impl ArtistListResponse {
+        pub fn new(data : impl IntoIterator<Item=impl Into<FlatArtist>>, page : &RequestPage) -> Self {
+            let entries : Vec<FlatArtist> = data.into_iter().map(|e|e.into()).collect();
+            let page = ResponsePage::new("/api/v1/library/artist/", &page, entries.len() == page.limit() as usize);
+            Self{
+                entries,
+                page,
+            }
+        }
+    }
+
+    impl From<models::Artist> for FlatArtist {
+        fn from(source: models::Artist) -> Self {
+            Self {
+                id: source.artist_id,
+                name: source.name,
+                is_faved: source.is_faved,
+                is_known_spot: source.is_known_spot,
+                is_known_local: source.is_known_local
+            }
+        }
+    }
+
+    #[derive(Serialize, Debug)]
+    pub struct FullArtist {
+        #[serde(flatten)]
+        flat : FlatArtist,
+
+        albums : Vec<FlatAlbum>,
+        genres : Vec<models::Genre>,
+        fav_tracks : Vec<models::Track>
+    }
+
+    impl FullArtist {
+        pub fn new(flat : impl Into<FlatArtist>,
+                   genres : impl IntoIterator<Item=impl Into<models::Genre>>,
+                   albums : impl IntoIterator<Item=impl Into<FlatAlbum>>,
+                   fav_tracks : impl IntoIterator<Item=models::Track>) -> Self {
+            Self {
+                flat: flat.into(),
+                albums: albums.into_iter().map(|e|e.into()).collect(),
+                genres: genres.into_iter().map(|e| e.into()).collect(),
+                fav_tracks: fav_tracks.into_iter().map(|e|e.into()).collect()
+            }
+        }
     }
 }

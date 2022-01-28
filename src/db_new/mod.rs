@@ -46,16 +46,16 @@ type Result<R> = std::result::Result<R, DbError>;
 #[derive(Error, Debug)]
 pub enum DbError{
     #[error("DB connection error: {0}")]
-    ConnectionError(#[from] r2d2::Error),
+    Connection(#[from] r2d2::Error),
 
     #[error("DB sql execution error: {0}")]
-    SqlError(#[from] diesel::result::Error),
+    Sql(#[from] diesel::result::Error),
     
     #[error("DB update failed: {0}")]
-    UpdateError(String),
+    Update(String),
     
     #[error("DB delete failed: {0}")]
-    DeleteError(String)
+    Delete(String)
 }
 
 pub trait FindById<T> {

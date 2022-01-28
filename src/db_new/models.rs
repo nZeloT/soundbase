@@ -17,7 +17,7 @@
 use crate::db_new::schema::*;
 use serde::{Serialize, Deserialize};
 
-#[derive(Queryable, Identifiable, Associations, AsChangeset, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, Associations, AsChangeset, Serialize, PartialEq, Debug)]
 #[table_name="genre"]
 #[primary_key(genre_id)]
 pub struct Genre {
@@ -39,6 +39,8 @@ pub struct Artist {
     pub artist_id : i32,
     pub name : String,
     pub is_faved : bool,
+    pub is_known_spot : bool,
+    pub is_known_local: bool,
     pub spot_id : Option<String>
 }
 
@@ -46,7 +48,9 @@ pub struct Artist {
 #[table_name = "artists"]
 pub struct NewArtist<'a> {
     pub name : &'a str,
-    pub spot_id : Option<String>
+    pub is_known_local : bool,
+    pub is_known_spot : bool,
+    pub spot_id : Option<String>,
 }
 
 #[derive(Identifiable, Queryable, Associations, AsChangeset, PartialEq, Debug)]
@@ -67,7 +71,7 @@ pub struct NewArtistGenre {
     pub genre_id : i32
 }
 
-#[derive(Queryable, Identifiable, Associations, AsChangeset, Serialize, PartialEq, Debug)]
+#[derive(Queryable, Identifiable, Associations, AsChangeset, Serialize, PartialEq, Debug, Clone)]
 #[table_name = "albums"]
 #[primary_key(album_id)]
 #[changeset_options(treat_none_as_null = "true")]
@@ -78,6 +82,8 @@ pub struct Album {
     pub year : i32,
     pub total_tracks : Option<i32>,
     pub is_faved : bool,
+    pub is_known_spot : bool,
+    pub is_known_local : bool,
     pub was_aow : bool,
     pub spot_id : Option<String>
 }
@@ -89,6 +95,8 @@ pub struct NewAlbum<'a> {
     pub album_type : Option<i32>,
     pub year : i32,
     pub total_tracks : i32,
+    pub is_known_local : bool,
+    pub is_known_spot : bool,
     pub is_faved : Option<bool>,
     pub was_aow : Option<bool>,
     pub spot_id : Option<String>
@@ -151,7 +159,7 @@ pub struct Track {
     pub album_id : i32,
     pub disc_number : Option<i32>,
     pub track_number : Option<i32>,
-    pub duration_ms : i32,
+    pub duration_ms : i64,
     pub is_faved : bool,
     pub local_file : Option<String>,
     pub spot_id : Option<String>
@@ -182,7 +190,7 @@ pub struct NewTrack<'a> {
     pub album_id : i32,
     pub disc_number : Option<i32>,
     pub track_number : Option<i32>,
-    pub duration_ms : i32,
+    pub duration_ms : i64,
     pub is_faved : bool,
     pub local_file : Option<String>,
     pub spot_id : Option<String>

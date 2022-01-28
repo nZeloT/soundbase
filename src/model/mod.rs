@@ -24,10 +24,9 @@ pub enum UniversalId {
 
 impl From<&str> for UniversalId {
     fn from(input: &str) -> Self {
-        match &input[..2] {
-            "s:" => UniversalId::Spotify(input[2..].to_string()),
-            "d:" => UniversalId::Database(input[2..].parse::<i32>().unwrap()),
-            _ => panic!("Invalid UniversalId!")
+        match &input[..1] {
+            "s" => UniversalId::Spotify(input.to_string()),
+            _ => UniversalId::Database(input.parse::<i32>().unwrap()),
         }
     }
 }

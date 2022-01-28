@@ -20,7 +20,9 @@
 //  3. /api/v1/track_proposal/<id>/discard
 //  4. /api/v1/track-proposal/<id>/matches?search=
 
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use itertools::Itertools;
 use rspotify::model::{ArtistId, FullArtist, FullTrack};
 use serde::{Deserialize, Serialize};
 use warp::reply::Reply;
@@ -66,6 +68,7 @@ struct ProposalMatch {
     pub proposal_id: i32,
     pub title: String,
     pub album: String,
+    pub album_year : i32,
     pub artists: Vec<String>,
     pub confidence: f32,
 }
@@ -138,10 +141,22 @@ async fn find_matches(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposal
     match search_results {
         Ok(candidates) => {
             let mut matches = candidates.iter()
+                .unique_by(|&track| track.id.as_ref().unwrap().clone())
                 .map(|candidate| map_track_to_proposal_match(&proposal, candidate))
                 .map(|prop_match| try_find_spotify_id_on_db(&db, prop_match))
                 .collect::<Vec<ProposalMatch>>();
-            matches.sort_unstable_by(|lhs, rhs| lhs.confidence.partial_cmp(&rhs.confidence).unwrap());
+            matches.sort_by(|lhs, rhs| {
+                let cmp = lhs.confidence.partial_cmp(&rhs.confidence).unwrap();
+                if cmp == Ordering::Equal {
+                    match lhs.album_year.partial_cmp(&rhs.album_year).unwrap() {
+                        Ordering::Equal => Ordering::Equal,
+                        Ordering::Greater => Ordering::Less,
+                        Ordering::Less => Ordering::Greater,
+                    }
+                }else {
+                    cmp
+                }
+            });
             matches.reverse();
             Ok(matches)
         }
@@ -193,6 +208,7 @@ fn map_track_to_proposal_match(proposal: &TrackFavProposal, track: &FullTrack) -
         proposal_id: proposal.track_fav_id,
         title: track.name.clone(),
         album: track.album.name.clone(),
+        album_year: track.album.release_date.as_ref().unwrap()[..4].parse::<i32>().unwrap(),
         artists: track.artists.iter().map(|a| a.name.clone()).collect::<Vec<String>>(),
         confidence,
     }
@@ -233,6 +249,7 @@ fn try_find_spotify_id_on_db<DB>(db: &DB, prop_match: ProposalMatch) -> Proposal
                     id: UniversalId::Database(track.track_id),
                     artists: prop_match.artists,
                     album: prop_match.album,
+                    album_year: prop_match.album_year,
                     title: prop_match.title,
                     proposal_id: prop_match.proposal_id,
                     confidence: prop_match.confidence,
@@ -260,6 +277,8 @@ async fn insert_track_from_spotify_id(db: &DbApi, spotify: &SpotifyApi, spot_id:
             name: &*spotify_album.name,
             year: spotify_album.release_date[..4].parse::<i32>()?,
             total_tracks: spotify_album.tracks.total as i32,
+            is_known_spot: true,
+            is_known_local: false,
             was_aow: Some(false),
             is_faved: Some(false),
             spot_id: Some(spot_id.to_string()),
@@ -285,7 +304,7 @@ async fn insert_track_from_spotify_id(db: &DbApi, spotify: &SpotifyApi, spot_id:
             track_number: Some(spotify_track.track_number as i32),
             disc_number: Some(spotify_track.disc_number as i32),
             local_file: None,
-            duration_ms: spotify_track.duration.as_millis() as i32,
+            duration_ms: spotify_track.duration.as_millis() as i64,
             spot_id: Some(spotify_track.id.unwrap().to_string()),
         })?
     };
@@ -330,6 +349,8 @@ fn find_or_insert_artist<DB>(db: &DB, artist: &FullArtist) -> Result<Artist>
         None => db.new_full_artist(NewArtist {
             name: &*artist.name,
             spot_id: Some(artist.id.to_string()),
+            is_known_local: false,
+            is_known_spot: true
         })?
     };
     Ok(db_artist)

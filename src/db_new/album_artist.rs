@@ -23,8 +23,8 @@ use crate::db_new::schema::*;
 pub trait AlbumArtistsDb : Sync {
     fn new_album_artist(&self, artist_id: i32, album_id: i32) -> Result<AlbumArtists>;
     fn new_album_artist_if_missing(&self, artist_id: i32, album_id: i32) -> Result<AlbumArtists>;
-    fn load_albums_for_artist(&self, artist: &Artist, offset: i64, limit: i64) -> Result<Vec<Album>>;
-    fn load_artists_for_album(&self, album: &Album, offset: i64, limit: i64) -> Result<Vec<Artist>>;
+    fn load_albums_for_artist(&self, artist: &Artist) -> Result<Vec<Album>>;
+    fn load_artists_for_album(&self, album: &Album) -> Result<Vec<Artist>>;
 }
 
 impl AlbumArtistsDb for DbApi {
@@ -53,7 +53,7 @@ impl AlbumArtistsDb for DbApi {
         }
     }
 
-    fn load_albums_for_artist(&self, artist: &Artist, offset: i64, limit: i64) -> Result<Vec<Album>> {
+    fn load_albums_for_artist(&self, artist: &Artist) -> Result<Vec<Album>> {
         use crate::db_new::schema::album_artists::dsl::*;
         use diesel::dsl::any;
 
@@ -61,13 +61,11 @@ impl AlbumArtistsDb for DbApi {
         let album_ids = AlbumArtists::belonging_to(artist).select(album_id);
         let result = albums::table
             .filter(albums::album_id.eq(any(album_ids)))
-            .limit(limit)
-            .offset(offset)
             .load::<Album>(&conn);
         Ok(result?)
     }
 
-    fn load_artists_for_album(&self, album: &Album, offset: i64, limit: i64) -> Result<Vec<Artist>> {
+    fn load_artists_for_album(&self, album: &Album) -> Result<Vec<Artist>> {
         use crate::db_new::schema::album_artists::dsl::*;
         use diesel::dsl::any;
 
@@ -75,8 +73,6 @@ impl AlbumArtistsDb for DbApi {
         let artist_ids = AlbumArtists::belonging_to(album).select(artist_id);
         let result = artists::table
             .filter(artists::artist_id.eq(any(artist_ids)))
-            .limit(limit)
-            .offset(offset)
             .load::<Artist>(&conn);
         Ok(result?)
     }

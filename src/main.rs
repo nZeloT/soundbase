@@ -39,7 +39,8 @@ type WebResult<T> = std::result::Result<T, warp::Rejection>;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() {
-    let url_env_val = env::var("DATABASE_URL").expect("Failed to read ENV variable DATABASE_URL");
+    dotenv::dotenv().ok();
+    let url_env_val = dotenv::var("DATABASE_URL").expect("Failed to read ENV variable DATABASE_URL");
     let url = Url::parse(&*url_env_val).expect("Url is not valid!");
     let db_api = db_new::DbApi::new(url);
 
@@ -57,7 +58,7 @@ async fn main() {
     ).recover(error::handle_rejection);
 
 
-    let env_ip_str = match std::env::var("SERVER_IP") {
+    let env_ip_str = match dotenv::var("SERVER_IP") {
         Ok(given_ip) => given_ip,
         Err(_) => "192.168.2.111:3333".to_string()
     };

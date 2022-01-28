@@ -17,34 +17,21 @@ use diesel::prelude::*;
 
 use crate::db_new::{DbApi, DbError, DbPool, Result};
 use crate::db_new::{FindByFavedStatus, FindById};
-use crate::db_new::models::{Track, NewTrack, Album};
+use crate::db_new::models::{Track, NewTrack, Album, Artist, TrackArtists};
 use crate::db_new::schema::*;
 use crate::model::{RequestPage, UniversalId};
 
 pub trait TrackDb: FindById<Track> + FindByFavedStatus<Track> + Sync {
-    fn new_track(&self, title: &str, album_id: i32, duration_ms: i32, is_faved: bool) -> Result<Track>;
     fn new_full_track(&self, new_track: NewTrack) -> Result<Track>;
     fn find_track_by_album(&self, album : &Album, name : &str) -> Result<Option<Track>>;
     fn find_track_by_universal_id(&self, uni_id : &UniversalId) -> Result<Option<Track>>;
     fn load_tracks_for_album(&self, album : &Album) -> Result<Vec<Track>>;
+    fn load_fav_tracks_for_artist(&self, artist : &Artist, page : &RequestPage) -> Result<Vec<Track>>;
     fn load_tracks(&self, page : &RequestPage) -> Result<Vec<Track>>;
     fn set_faved_state(&self, track_id : i32, now_faved : bool) -> Result<()>;
 }
 
 impl TrackDb for DbApi {
-    fn new_track(&self, title: &str, album_id: i32, duration_ms: i32, is_faved: bool) -> Result<Track> {
-        let new_track = NewTrack {
-            title,
-            album_id,
-            disc_number: None,
-            track_number: None,
-            duration_ms,
-            is_faved,
-            local_file: None,
-            spot_id: None,
-        };
-        self.new_full_track(new_track)
-    }
 
     fn new_full_track(&self, new_track: NewTrack) -> Result<Track> {
         let conn = self.0.get()?;
@@ -93,6 +80,18 @@ impl TrackDb for DbApi {
         Ok(result?)
     }
 
+    fn load_fav_tracks_for_artist(&self, artist: &Artist, page: &RequestPage) -> Result<Vec<Track>> {
+        let conn = self.0.get()?;
+        let tracks = TrackArtists::belonging_to(artist).select(track_artist::track_id);
+        let results = tracks::table
+            .filter(tracks::track_id.eq(diesel::dsl::any(tracks)))
+            .filter(tracks::is_faved.eq(true))
+            .offset(page.offset())
+            .limit(page.limit())
+            .load::<Track>(&conn);
+        Ok(results?)
+    }
+
     fn set_faved_state(&self, id: i32, now_faved: bool) -> Result<()> {
         let conn = self.0.get()?;
         let updated = diesel::update(
@@ -103,7 +102,7 @@ impl TrackDb for DbApi {
         if updated == 1 {
             Ok(())
         }else{
-            Err(DbError::UpdateError(format!("Failed to set track {} to fav state {}", id, now_faved)))
+            Err(DbError::Update(format!("Failed to set track {} to fav state {}", id, now_faved)))
         }
     }
 }

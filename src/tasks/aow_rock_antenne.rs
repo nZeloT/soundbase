@@ -54,7 +54,7 @@ pub async fn fetch_new_rockantenne_album_of_week(api: DbApi) -> Result<()>
 
     let new_aofw_date = chrono::DateTime::parse_from_rfc3339(&date_string)?;
     if has_db_entry_for_week(&api, new_aofw_date.year(), new_aofw_date.iso_week().week() as i32)? {
-        let artist = api.get_or_create_artist(&*artist, || NewArtist { name: &*artist, spot_id: None })?;
+        let artist = api.get_or_create_artist(&*artist, || NewArtist { name: &*artist, spot_id: None, is_known_spot: false, is_known_local: false })?;
         let album = api.get_or_create_album(&artist, &*album_name, || {
             NewAlbum {
                 name: &*album_name,
@@ -64,6 +64,8 @@ pub async fn fetch_new_rockantenne_album_of_week(api: DbApi) -> Result<()>
                 album_type: None,
                 is_faved: Some(false),
                 total_tracks: album_track_count,
+                is_known_spot: false,
+                is_known_local: false
             }
         })?;
 

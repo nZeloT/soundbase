@@ -130,17 +130,17 @@ impl SpotifyApi {
     }
 
     fn _get_env_vars() -> Result<(String, String, String)> {
-        let redir_url = match std::env::var("REDIRECT_URI") {
+        let redir_url = match dotenv::var("REDIRECT_URI") {
             Ok(uri) => uri,
             Err(_) => return Err(Error::InternalError(format!("Failed to read REDIRECT_URI!")))
         };
 
-        let client_id = match std::env::var("CLIENT_ID") {
+        let client_id = match dotenv::var("CLIENT_ID") {
             Ok(client_id) => client_id,
             Err(_) => return Err(Error::InternalError(format!("Failed to read CLIENT_ID!")))
         };
 
-        let client_sec = match std::env::var("CLIENT_SECRET") {
+        let client_sec = match dotenv::var("CLIENT_SECRET") {
             Ok(secret) => secret,
             Err(_) => return Err(Error::InternalError(format!("Failed to read CLIENT_SECRET!")))
         };

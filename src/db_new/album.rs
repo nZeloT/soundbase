@@ -23,7 +23,6 @@ use crate::db_new::schema::*;
 use crate::model::{RequestPage, UniversalId};
 
 pub trait AlbumDb: FindById<Album> + FindByFavedStatus<Album> + Sync {
-    fn new_album(&self, name: &str, year: i32, total_tracks: i32) -> Result<Album>;
     fn new_full_album(&self, new_album: NewAlbum) -> Result<Album>;
     fn find_by_artist_and_name(&self, artist: &Artist, name: &str) -> Result<Option<Album>>;
     fn find_by_universal_id(&self, id : &UniversalId) -> Result<Option<Album>>;
@@ -34,19 +33,6 @@ pub trait AlbumDb: FindById<Album> + FindByFavedStatus<Album> + Sync {
 }
 
 impl AlbumDb for DbApi {
-    fn new_album(&self, name: &str, year: i32, total_tracks: i32) -> Result<Album> {
-        let new_album = NewAlbum {
-            name,
-            year,
-            total_tracks,
-            album_type: None,
-            is_faved: None,
-            was_aow: None,
-            spot_id: None,
-        };
-        self.new_full_album(new_album)
-    }
-
     fn new_full_album(&self, new_album: NewAlbum) -> Result<Album> {
         let conn = self.0.get()?;
         let result = diesel::insert_into(albums::table)

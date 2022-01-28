@@ -66,8 +66,8 @@ impl TrackFavProposalDb for DbApi {
         ).set(track_fav_proposals::track_id.eq(track_id))
             .execute(&conn)?;
 
-        if updated == 0 { Ok(()) } else{
-            Err(DbError::UpdateError(format!("Failed to link track proposal {} to track {}", id, track_id)))
+        if updated == 1 { Ok(()) } else{
+            Err(DbError::Update(format!("Failed to link track proposal {} to track {}", id, track_id)))
         }
     }
 
@@ -79,8 +79,8 @@ impl TrackFavProposalDb for DbApi {
                 .filter(track_fav_proposals::track_fav_id.eq(id))
         ).execute(&conn)?;
 
-        if deleted == 0 { Ok(()) } else{
-            Err(DbError::DeleteError(format!("Failed to delete proposal {}", id)))
+        if deleted == 1 { Ok(()) } else{
+            Err(DbError::Delete(format!("Failed to delete proposal {}", id)))
         }
     }
 }

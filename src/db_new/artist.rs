@@ -23,7 +23,6 @@ use crate::db_new::schema::*;
 use crate::model::{RequestPage, UniversalId};
 
 pub trait ArtistDb: FindById<Artist> + FindByFavedStatus<Artist> {
-    fn new_artist(&self, name: &str, spot_id: Option<String>) -> Result<Artist>;
     fn new_full_artist(&self, new_artist: NewArtist) -> Result<Artist>;
     fn find_artist_by_name(&self, name: &str) -> Result<Option<Artist>>;
     fn find_artist_by_universal_id(&self, id : &UniversalId) -> Result<Option<Artist>>;
@@ -31,12 +30,6 @@ pub trait ArtistDb: FindById<Artist> + FindByFavedStatus<Artist> {
 }
 
 impl ArtistDb for DbApi {
-    fn new_artist(&self, name: &str, spot_id: Option<String>) -> Result<Artist> {
-        self.new_full_artist(NewArtist {
-            name,
-            spot_id,
-        })
-    }
 
     fn new_full_artist(&self, new_artist: NewArtist) -> Result<Artist> {
         let conn = self.0.get()?;

@@ -18,6 +18,8 @@ create table artists
         constraint artist_unique
             unique,
     is_faved  boolean     not null default false,
+    is_known_spot boolean not null default false,
+    is_known_local boolean not null default false,
     spot_id   VARCHAR(64)
 );
 
@@ -39,6 +41,8 @@ create table albums
     year         integer     not null,
     total_tracks integer,
     is_faved     boolean     not null default false,
+    is_known_spot boolean not null default false,
+    is_known_local boolean not null default false,
     was_aow      boolean     not null default false,
     spot_id      VARCHAR(64)
 );
@@ -62,7 +66,7 @@ create table tracks
             on delete cascade,
     disc_number  integer,
     track_number integer,
-    duration_ms  integer     not null,
+    duration_ms  bigint     not null,
     is_faved     boolean     not null default false,
     local_file   VARCHAR(1024),
     spot_id      VARCHAR(64)
