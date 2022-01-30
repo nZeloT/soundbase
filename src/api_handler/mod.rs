@@ -48,3 +48,7 @@ pub async fn spotify_auth_callback(api: SpotifyApi, params: HashMap<String, Stri
         None => Err(warp::reject::custom(Error::RequestError("Couldn't parse query parameter 'code'!".to_string())))
     }
 }
+
+fn path_prefix(str : &str) -> String {
+    "/api/v1/".to_string() + str
+}

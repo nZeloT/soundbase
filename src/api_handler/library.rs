@@ -31,7 +31,6 @@ use crate::db_new::album_artist::AlbumArtistsDb;
 use crate::db_new::artist::ArtistDb;
 use crate::db_new::artist_genre::ArtistGenreDb;
 use crate::db_new::DbApi;
-use crate::db_new::models::{Album, Artist, Track};
 use crate::db_new::track::TrackDb;
 use crate::error::Error;
 use crate::model::RequestPage;
@@ -122,6 +121,11 @@ pub async fn load_single_artist(artist_id : i32, db : DbApi) -> WebResult<impl R
     }
 }
 
+fn library_prefix(str : &str) -> String {
+    let s = "library/".to_string() + str;
+    super::path_prefix(&s)
+}
+
 mod library_models {
     use serde::Serialize;
 
@@ -138,7 +142,7 @@ mod library_models {
 
     impl TrackListResponse {
         pub fn new(data: Vec<models::Track>, page: &RequestPage) -> Self {
-            let page = ResponsePage::new("/api/v1/library/track/", &page, data.len() == page.limit() as usize);
+            let page = ResponsePage::new(&super::library_prefix("track/"), &page, data.len() == page.limit() as usize);
             Self {
                 entries: data,
                 page,
@@ -167,7 +171,7 @@ mod library_models {
     impl AlbumsListResponse {
         pub fn new(data : impl IntoIterator<Item=impl Into<FlatAlbum>>, page : &RequestPage) -> Self {
             let entries : Vec<FlatAlbum> = data.into_iter().map(|e|e.into()).collect();
-            let page = ResponsePage::new("/api/v1/library/album/", &page, entries.len() == page.limit() as usize);
+            let page = ResponsePage::new(&super::library_prefix("album/"), &page, entries.len() == page.limit() as usize);
             Self {
                 entries,
                 page,
@@ -231,7 +235,7 @@ mod library_models {
     impl ArtistListResponse {
         pub fn new(data : impl IntoIterator<Item=impl Into<FlatArtist>>, page : &RequestPage) -> Self {
             let entries : Vec<FlatArtist> = data.into_iter().map(|e|e.into()).collect();
-            let page = ResponsePage::new("/api/v1/library/artist/", &page, entries.len() == page.limit() as usize);
+            let page = ResponsePage::new(&super::library_prefix("artist/"), &page, entries.len() == page.limit() as usize);
             Self{
                 entries,
                 page,

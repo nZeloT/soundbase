@@ -16,7 +16,7 @@
 
 use diesel::prelude::*;
 
-use crate::db_new::{DbApi, DbPool, Result};
+use crate::db_new::{DbApi, DbError, DbPool, Result};
 use crate::db_new::{FindByFavedStatus, FindById};
 use crate::db_new::models::{Artist, NewArtist};
 use crate::db_new::schema::*;
@@ -27,6 +27,7 @@ pub trait ArtistDb: FindById<Artist> + FindByFavedStatus<Artist> {
     fn find_artist_by_name(&self, name: &str) -> Result<Option<Artist>>;
     fn find_artist_by_universal_id(&self, id : &UniversalId) -> Result<Option<Artist>>;
     fn load_artists(&self, page : &RequestPage) -> Result<Vec<Artist>>;
+    fn set_faved_state(&self, artist_id : i32, now_faved : bool) -> Result<()>;
 }
 
 impl ArtistDb for DbApi {
@@ -67,6 +68,19 @@ impl ArtistDb for DbApi {
         let conn = self.0.get()?;
         let result = artists::table.offset(page.offset()).limit(page.limit()).load::<Artist>(&conn);
         Ok(result?)
+    }
+
+    fn set_faved_state(&self, artist_id: i32, now_faved: bool) -> Result<()> {
+        let conn = self.0.get()?;
+        let updated = diesel::update(
+            artists::table.filter(artists::artist_id.eq(artist_id))
+        ).set(artists::is_faved.eq(now_faved))
+            .execute(&conn)?;
+        if updated == 1 {
+            Ok(())
+        }else{
+            Err(DbError::Update(format!("Failed to set artist {} to fav state {}!", artist_id, now_faved)))
+        }
     }
 }
 

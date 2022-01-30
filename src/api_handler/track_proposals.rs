@@ -23,21 +23,20 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use itertools::Itertools;
-use rspotify::model::{ArtistId, FullArtist, FullTrack};
+use rspotify::model::{ArtistId, FullTrack};
 use serde::{Deserialize, Serialize};
 use warp::reply::Reply;
-use crate::db_new::album::AlbumDb;
 use crate::db_new::album_artist::AlbumArtistsDb;
-use crate::db_new::artist::ArtistDb;
 
 use crate::db_new::DbApi;
-use crate::db_new::models::{Artist, NewAlbum, NewArtist, NewTrack, Track, TrackFavProposal};
+use crate::db_new::models::{Artist, Track, TrackFavProposal};
 use crate::db_new::track::TrackDb;
 use crate::db_new::track_artist::TrackArtistsDb;
 use crate::db_new::track_fav_proposal::TrackFavProposalDb;
 use crate::error::Error;
-use crate::model::{AlbumType, RequestPage, ResponsePage, UniversalId};
+use crate::model::{RequestPage, ResponsePage, UniversalId};
 use crate::{SpotifyApi, WebResult, Result};
+use crate::spotify::db_utils::{get_or_create_album, get_or_create_artist, get_or_create_track};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MatchesQuery {
@@ -54,7 +53,7 @@ struct TrackFavProposalListResponse {
 
 impl TrackFavProposalListResponse {
     pub fn new(data: Vec<TrackFavProposal>, page: &RequestPage) -> Self {
-        let page = ResponsePage::new("/api/v1/track-proposals/", page, data.len() == page.limit() as usize);
+        let page = ResponsePage::new(&super::path_prefix("track-proposals/"), page, data.len() == page.limit() as usize);
         Self {
             entries: data,
             page,
@@ -137,6 +136,8 @@ async fn find_matches(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposal
 
     //TODO also search on DB; but fuzzy search requires some Indexing
 
+    //TODO: handle linked tracks
+
     let search_results = spotify.search(&*spotify_search_string, RequestPage::new(0, 10)).await;
     match search_results {
         Ok(candidates) => {
@@ -145,6 +146,7 @@ async fn find_matches(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposal
                 .map(|candidate| map_track_to_proposal_match(&proposal, candidate))
                 .map(|prop_match| try_find_spotify_id_on_db(&db, prop_match))
                 .collect::<Vec<ProposalMatch>>();
+
             matches.sort_by(|lhs, rhs| {
                 let cmp = lhs.confidence.partial_cmp(&rhs.confidence).unwrap();
                 if cmp == Ordering::Equal {
@@ -177,13 +179,15 @@ async fn confirm_match(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposa
 
     //link proposal with track
     let _ = db.link_to_track(proposal.track_fav_id, track_id)?;
-    let _ = db.set_faved_state(track_id, true)?;
+    let api : &dyn TrackDb = &db;
+    let _ = api.set_faved_state(track_id, true)?;
     Ok(())
 }
 
 fn discard_proposal_and_unfav_track(db: &DbApi, proposal: TrackFavProposal) -> Result<()> {
     if let Some(track_id) = proposal.track_id {
-        db.set_faved_state(track_id, false)?;
+        let api : &dyn TrackDb = db;
+        api.set_faved_state(track_id, false)?;
     }
     db.delete_track_proposal(proposal.track_fav_id)?;
     Ok(())
@@ -265,26 +269,11 @@ fn try_find_spotify_id_on_db<DB>(db: &DB, prop_match: ProposalMatch) -> Proposal
 }
 
 async fn insert_track_from_spotify_id(db: &DbApi, spotify: &SpotifyApi, spot_id: &str) -> Result<Track> {
-    let spotify_track = spotify.get_track(spot_id).await?;
-    let spotify_album = spotify.get_album(&spotify_track.album.id.unwrap()).await?;
+    let spotify_track = spotify.get_track_from(spot_id).await?;
+    let spotify_album = spotify.get_album(&spotify_track.album.id.as_ref().clone().unwrap()).await?;
 
     //lets first add the album
-    let api: &dyn AlbumDb = db;
-    let id = UniversalId::Spotify(spotify_album.id.to_string());
-    let db_album = match api.find_by_universal_id(&id)? {
-        Some(album) => album,
-        None => api.new_full_album(NewAlbum {
-            name: &*spotify_album.name,
-            year: spotify_album.release_date[..4].parse::<i32>()?,
-            total_tracks: spotify_album.tracks.total as i32,
-            is_known_spot: true,
-            is_known_local: false,
-            was_aow: Some(false),
-            is_faved: Some(false),
-            spot_id: Some(spot_id.to_string()),
-            album_type: Some(AlbumType::from(spotify_album.album_type).into()),
-        })?
-    };
+    let db_album = get_or_create_album(db, &spotify_album)?;
 
     let album_artist_ids = spotify_album.artists
         .iter()
@@ -293,21 +282,7 @@ async fn insert_track_from_spotify_id(db: &DbApi, spotify: &SpotifyApi, spot_id:
 
 
     //now add the track
-    let api: &dyn TrackDb = db;
-    let id = UniversalId::Spotify(spotify_track.id.clone().unwrap().to_string());
-    let db_track = match api.find_track_by_universal_id(&id)? {
-        Some(track) => track,
-        None => api.new_full_track(NewTrack {
-            title: &*spotify_track.name,
-            is_faved: false,
-            album_id: db_album.album_id,
-            track_number: Some(spotify_track.track_number as i32),
-            disc_number: Some(spotify_track.disc_number as i32),
-            local_file: None,
-            duration_ms: spotify_track.duration.as_millis() as i64,
-            spot_id: Some(spotify_track.id.unwrap().to_string()),
-        })?
-    };
+    let db_track = get_or_create_track(db, &db_album, &spotify_track)?;
 
     let track_artist_ids = spotify_track.artists
         .iter()
@@ -318,10 +293,10 @@ async fn insert_track_from_spotify_id(db: &DbApi, spotify: &SpotifyApi, spot_id:
     all_artist_ids.extend(album_artist_ids.clone());
     all_artist_ids.extend(track_artist_ids.clone());
 
-    let spotify_artists = spotify.get_artists(&all_artist_ids.into_iter().collect()).await?;
+    let spotify_artists = spotify.get_artists(&all_artist_ids.into_iter().collect::<Vec<ArtistId>>()).await?;
     let mut artist_id_to_db_artist : HashMap<String, Artist> = HashMap::new();
     for spotify_artist in &spotify_artists {
-        let artist = find_or_insert_artist(db, spotify_artist)?;
+        let artist = get_or_create_artist(db, spotify_artist)?;
         artist_id_to_db_artist.insert(spotify_artist.id.to_string(), artist);
     }
 
@@ -339,19 +314,4 @@ async fn insert_track_from_spotify_id(db: &DbApi, spotify: &SpotifyApi, spot_id:
     }
 
     Ok(db_track)
-}
-
-fn find_or_insert_artist<DB>(db: &DB, artist: &FullArtist) -> Result<Artist>
-    where DB: ArtistDb {
-    let id = UniversalId::Spotify(artist.id.to_string());
-    let db_artist = match db.find_artist_by_universal_id(&id)? {
-        Some(artist) => artist,
-        None => db.new_full_artist(NewArtist {
-            name: &*artist.name,
-            spot_id: Some(artist.id.to_string()),
-            is_known_local: false,
-            is_known_spot: true
-        })?
-    };
-    Ok(db_artist)
 }

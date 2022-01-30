@@ -17,10 +17,12 @@
 
 use crate::db_new::DbApi;
 use crate::error::{Error};
-use crate::Result;
+use crate::{Result, SpotifyApi};
+use crate::tasks::spotify_import::SpotifyImporter;
 
 mod aow_rock_antenne;
 mod tow_rock_antenne;
+mod spotify_import;
 
 pub fn launch_fetch_albums_of_week(db : &DbApi) {
     let api = db.clone();
@@ -36,6 +38,16 @@ pub fn launch_fetch_charts(db : &DbApi) {
     tokio::task::spawn(async move {
         if let Err(e) = tow_rock_antenne::fetch_new_rockantenne_top20_of_week(api).await {
             println!("Charts Fetch for Rock Antenne raised an Error! => {:?}", e);
+        }
+    });
+}
+
+pub fn launch_spotify_import(db : &DbApi, spotify : &SpotifyApi) {
+    let db = db.clone();
+    let spotify = spotify.clone();
+    tokio::task::spawn(async move {
+        if let Err(e) = SpotifyImporter::new(db, spotify).do_import().await {
+            println!("Error occured during spotify import! => {:?}", e);
         }
     });
 }

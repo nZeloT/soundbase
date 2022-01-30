@@ -16,7 +16,7 @@
 
 use diesel::prelude::*;
 
-use crate::db_new::{DbApi, DbPool, Result};
+use crate::db_new::{DbApi, DbError, DbPool, Result};
 use crate::db_new::{FindByFavedStatus, FindById};
 use crate::db_new::models::{Album, AlbumArtists, AlbumOfWeek, Artist, NewAlbum, Track};
 use crate::db_new::schema::*;
@@ -30,6 +30,7 @@ pub trait AlbumDb: FindById<Album> + FindByFavedStatus<Album> + Sync {
     fn load_album_for_aow(&self, aow: &AlbumOfWeek) -> Result<Album>;
     fn load_albums(&self, page : &RequestPage) -> Result<Vec<Album>>;
     fn set_was_aow(&self, album: &Album, was_aow: bool) -> Result<Album>;
+    fn set_faved_state(&self, album_id : i32, now_faved : bool) -> Result<()>;
 }
 
 impl AlbumDb for DbApi {
@@ -92,6 +93,19 @@ impl AlbumDb for DbApi {
         ).set(albums::was_aow.eq(was_aow))
             .get_result(&conn);
         Ok(result?)
+    }
+
+    fn set_faved_state(&self, album_id: i32, now_faved: bool) -> Result<()> {
+        let conn = self.0.get()?;
+        let updated = diesel::update(
+            albums::table.filter(albums::album_id.eq(album_id))
+        ).set(albums::is_faved.eq(now_faved))
+            .execute(&conn)?;
+        if updated == 1 {
+            Ok(())
+        }else{
+            Err(DbError::Update(format!("Failed to set fav state on album {} to {}!", album_id, now_faved)))
+        }
     }
 }
 

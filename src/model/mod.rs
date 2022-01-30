@@ -31,6 +31,18 @@ impl From<&str> for UniversalId {
     }
 }
 
+impl From<&rspotify::model::ArtistId> for UniversalId {
+    fn from(input : &rspotify::model::ArtistId) -> Self {
+        UniversalId::Spotify(input.to_string())
+    }
+}
+
+impl From<&rspotify::model::AlbumId> for UniversalId {
+    fn from(input : &rspotify::model::AlbumId) -> Self {
+        UniversalId::Spotify(input.to_string())
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct RequestPage {
     offset: Option<i64>,

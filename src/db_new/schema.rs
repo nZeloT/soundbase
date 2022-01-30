@@ -67,7 +67,7 @@ table! {
 table! {
     genre (genre_id) {
         genre_id -> Int4,
-        name -> Text,
+        name -> Varchar,
     }
 }
 

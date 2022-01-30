@@ -28,6 +28,8 @@ use crate::error::Error;
 use crate::model::RequestPage;
 use crate::Result;
 
+pub mod db_utils;
+
 #[derive(Clone)]
 pub struct SpotifyApi(Arc<RwLock<AuthCodeSpotify>>);
 
@@ -47,14 +49,18 @@ impl SpotifyApi {
             SearchResult::Tracks(page) => {
                 Ok(page.items)
             }
-            _ => Err(Error::InternalError(format!("Expected Tracks but didn't get!")))
+            _ => Err(Error::InternalError("Expected Tracks but didn't get!".to_string()))
         }
     }
 
-    pub async fn get_track(&self, id: &str) -> Result<FullTrack> {
+    pub async fn get_track(&self, id : &TrackId) -> Result<FullTrack> {
         let client = self.0.read().await;
+        Ok(client.track(id).await?)
+    }
+
+    pub async fn get_track_from(&self, id: &str) -> Result<FullTrack> {
         let track_id = TrackId::from_str(id)?;
-        Ok(client.track(&track_id).await?)
+        self.get_track(&track_id).await
     }
 
     pub async fn get_album(&self, album_id: &AlbumId) -> Result<FullAlbum> {
@@ -62,9 +68,35 @@ impl SpotifyApi {
         Ok(client.album(album_id).await?)
     }
 
-    pub async fn get_artists(&self, artist_ids: &Vec<ArtistId>) -> Result<Vec<FullArtist>> {
+    pub async fn get_artists(&self, artist_ids: &[ArtistId]) -> Result<Vec<FullArtist>> {
         let client = self.0.read().await;
         Ok(client.artists(artist_ids).await?)
+    }
+
+    pub async fn get_saved_artists(&self, after : Option<&str>, limit : Option<u32>) -> Result<(i32, Vec<FullArtist>)> {
+        let client = self.0.read().await;
+        let page = client.current_user_followed_artists(after, limit).await?;
+        Ok((page.total.unwrap() as i32, page.items))
+    }
+
+    pub async fn get_saved_albums(&self, page : &RequestPage) -> Result<(i32, Vec<FullAlbum>)> {
+        let client = self.0.read().await;
+        let page = client.current_user_saved_albums_manual(
+            Some(&Market::FromToken),
+            Some(page.limit() as u32),
+            Some(page.offset() as u32)
+        ).await?;
+        Ok((page.total as i32, page.items.iter().map(|a|a.album.clone()).collect::<Vec<FullAlbum>>()))
+    }
+
+    pub async fn get_saved_tracks(&self, page : &RequestPage) -> Result<(i32, Vec<FullTrack>)> {
+        let client = self.0.read().await;
+        let page = client.current_user_saved_tracks_manual(
+            Some(&Market::FromToken),
+            Some(page.limit() as u32),
+            Some(page.offset() as u32)
+        ).await?;
+        Ok((page.total as i32, page.items.iter().map(|t|t.track.clone()).collect::<Vec<FullTrack>>()))
     }
 
     pub async fn save_track(&self, id: &str) -> Result<()>

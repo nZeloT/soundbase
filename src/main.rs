@@ -17,7 +17,6 @@
 #[macro_use]
 extern crate diesel;
 
-use std::env;
 use std::net::SocketAddr;
 
 use url::Url;
@@ -151,8 +150,16 @@ mod filters {
             .and(warp::get())
             .and(with_db(db.clone()))
             .and_then(api_handler::tasks::fetch_charts);
+        let spot_import = warp::path!("import")
+            .and(warp::get())
+            .and(with_db(db.clone()))
+            .and(with_spotify(spotify.clone()))
+            .and_then(api_handler::tasks::import_from_spotify);
         let task_api = warp::path!("tasks" / ..)
-            .and(album_of_week.or(charts));
+            .and(album_of_week
+                .or(charts)
+                .or(spot_import)
+            );
 
         let song_like_proto = warp::path!("song-like-proto")
             .and(warp::post())

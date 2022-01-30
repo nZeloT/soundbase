@@ -4,7 +4,7 @@ create table genre
     genre_id serial
         constraint genre_pk
             primary key,
-    name     text not null
+    name     VARCHAR(64) not null
 );
 
 create unique index genre_name_uindex
@@ -14,7 +14,7 @@ create table artists
 (
     artist_id serial
         primary key,
-    name      VARCHAR(64) not null
+    name      VARCHAR(256) not null
         constraint artist_unique
             unique,
     is_faved  boolean     not null default false,
@@ -36,7 +36,7 @@ create table albums
 (
     album_id     serial
         primary key,
-    name         VARCHAR(64) not null,
+    name         VARCHAR(256) not null,
     album_type   integer     not null default 0,
     year         integer     not null,
     total_tracks integer,
@@ -60,7 +60,7 @@ create table tracks
 (
     track_id     serial
         primary key,
-    title        VARCHAR(64) not null,
+    title        VARCHAR(256) not null,
     album_id     INTEGER     not null
         references albums (album_id)
             on delete cascade,
@@ -113,9 +113,9 @@ create table track_fav_proposals
 (
     track_fav_id     serial primary key,
     source_name      varchar(30) not null,
-    source_prop      varchar(96) not null,
-    ext_track_title  varchar(30) not null,
-    ext_artist_name  varchar(30) not null,
-    ext_album_name   varchar(30),
+    source_prop      varchar(1024) not null,
+    ext_track_title  varchar(256) not null,
+    ext_artist_name  varchar(256) not null,
+    ext_album_name   varchar(256),
     track_id integer references tracks (track_id) on delete cascade
 );

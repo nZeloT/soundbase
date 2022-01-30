@@ -16,7 +16,7 @@
 
 use warp::Reply;
 use crate::db_new::DbApi;
-use crate::{tasks, WebResult};
+use crate::{SpotifyApi, tasks, WebResult};
 
 pub async fn fetch_charts(db: DbApi) -> WebResult<impl Reply> {
     tasks::launch_fetch_charts(&db);
@@ -25,5 +25,10 @@ pub async fn fetch_charts(db: DbApi) -> WebResult<impl Reply> {
 
 pub async fn fetch_albums_of_week(db: DbApi) -> WebResult<impl Reply> {
     tasks::launch_fetch_albums_of_week(&db);
+    Ok(format!(""))
+}
+
+pub async fn import_from_spotify(db : DbApi, spotify : SpotifyApi) -> WebResult<impl Reply> {
+    tasks::launch_spotify_import(&db, &spotify);
     Ok(format!(""))
 }

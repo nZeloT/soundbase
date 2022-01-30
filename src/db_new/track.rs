@@ -71,15 +71,6 @@ impl TrackDb for DbApi {
         Ok(result?)
     }
 
-    fn load_tracks(&self, page : &RequestPage) -> Result<Vec<Track>> {
-        let conn = self.0.get()?;
-        let result = tracks::table
-            .offset(page.offset())
-            .limit(page.limit())
-            .load::<Track>(&conn);
-        Ok(result?)
-    }
-
     fn load_fav_tracks_for_artist(&self, artist: &Artist, page: &RequestPage) -> Result<Vec<Track>> {
         let conn = self.0.get()?;
         let tracks = TrackArtists::belonging_to(artist).select(track_artist::track_id);
@@ -90,6 +81,15 @@ impl TrackDb for DbApi {
             .limit(page.limit())
             .load::<Track>(&conn);
         Ok(results?)
+    }
+
+    fn load_tracks(&self, page : &RequestPage) -> Result<Vec<Track>> {
+        let conn = self.0.get()?;
+        let result = tracks::table
+            .offset(page.offset())
+            .limit(page.limit())
+            .load::<Track>(&conn);
+        Ok(result?)
     }
 
     fn set_faved_state(&self, id: i32, now_faved: bool) -> Result<()> {
