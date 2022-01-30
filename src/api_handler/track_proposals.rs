@@ -136,12 +136,19 @@ async fn find_matches(db: DbApi, spotify: SpotifyApi, proposal: TrackFavProposal
 
     //TODO also search on DB; but fuzzy search requires some Indexing
 
-    //TODO: handle linked tracks
-
-    let search_results = spotify.search(&*spotify_search_string, RequestPage::new(0, 10)).await;
+    let search_results = spotify.search(&*spotify_search_string, RequestPage::new(0, 5)).await;
     match search_results {
         Ok(candidates) => {
-            let mut matches = candidates.iter()
+            let mut unlinked : Vec<FullTrack> = Vec::new();
+            for candidate in candidates {
+                let track = match candidate.linked_from {
+                    Some(link) => spotify.get_track(&link.id).await?,
+                    None => candidate
+                };
+                unlinked.push(track);
+            }
+
+            let mut matches = unlinked.iter()
                 .unique_by(|&track| track.id.as_ref().unwrap().clone())
                 .map(|candidate| map_track_to_proposal_match(&proposal, candidate))
                 .map(|prop_match| try_find_spotify_id_on_db(&db, prop_match))
