@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package soundbase;
+
+service SpotifyAuth {
+    rpc GetAuthUrl(SpotifyAuthBlank) returns (SpotifyAuthUrls) {}
+    rpc SendAuthCode(SpotifyAuthString) returns (SpotifyAuthBlank) {}
+}
+
+message SpotifyAuthBlank {}
+message SpotifyAuthString {
+    string value = 1;
+}
+message SpotifyAuthUrls {
+    string auth_url = 1;
+    string redir_url = 2;
+}

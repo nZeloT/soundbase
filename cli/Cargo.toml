@@ -1,0 +1,24 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["Leon Steiner <leontsteiner@gmail.com>"]
+license = "Apache-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "soundbase-cli"
+path = "src/main.rs"
+
+
+[dependencies]
+clap = { version = "3.1", features = ["derive", "std", "color", "suggestions"] }
+prost = "0.9"
+prost-types = "0.9"
+tokio = { version = "1", features = ["full"] }
+tonic = "0.6"
+url = "2.2"
+warp = "0.3"
+
+[build-dependencies]
+tonic-build = "0.6"

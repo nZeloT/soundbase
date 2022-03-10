@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package soundbase;
+
+message FullArtist {
+    int32 artist_id = 1;
+    string name = 2;
+    bool is_faved = 3;
+    repeated SimpleAlbum albums = 4;
+}
+
+message SimpleArtist {
+    int32 artist_id = 1;
+    string name = 2;
+}
+
+message FullAlbum {
+    int32 album_id = 1;
+    string name = 2;
+    repeated SimpleArtist artists = 3;
+    repeated SimpleTrack tracks = 4;
+    AlbumTypes album_type = 5;
+    int32 year = 6;
+    optional int32 track_count = 7;
+    bool is_faved = 8;
+    bool was_album_of_week = 9;
+}
+
+message SimpleAlbum {
+    int32 album_id = 1;
+    string name = 2;
+}
+
+message FullTrack {
+    int32 track_id = 1;
+    string title = 2;
+    SimpleAlbum album = 3;
+    repeated SimpleArtist artists = 4;
+    optional int32 track_number = 5;
+    optional int32 disc_number = 6;
+    int64 duration_ms = 7;
+    bool is_faved = 8;
+}
+
+message SimpleTrack {
+    int32 track_id = 1;
+    string title = 2;
+    SimpleAlbum album = 3;
+    repeated SimpleArtist artists = 4;
+}
+
+enum LibraryEntities {
+    LIBRARY_ENTITIES_UNSPECIFIED = 0;
+    LIBRARY_ENTITIES_ARTIST = 1;
+    LIBRARY_ENTITIES_ALBUM = 2;
+    LIBRARY_ENTITIES_TRACK = 3;
+}
+
+enum AlbumTypes {
+    ALBUM_TYPES_UNSPECIFIED = 0;
+    ALBUM_TYPES_SINGLE = 1;
+    ALBUM_TYPES_ALBUM = 2;
+    ALBUM_TYPES_COMPILATION = 3;
+}

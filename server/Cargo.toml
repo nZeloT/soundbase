@@ -1,0 +1,39 @@
+[package]
+name = "server"
+version = "0.1.0"
+authors = ["Leon Steiner <leontsteiner@gmail.com>"]
+edition = "2021"
+license = "Apache-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "soundbase-server"
+path = "src/main.rs"
+
+[dependencies]
+chrono = "0.4"
+diesel = { version = "1.4", features = ["postgres", "r2d2", "chrono"]}
+dotenv = "0.15.0"
+futures = { version = "0.3", default-features = false, features = ["alloc"] }
+http = "0.2"
+itertools = "0.10"
+prost = "0.9"
+prost-types = "0.9"
+regex = "1.5"
+reqwest = { version = "0.11"}
+rspotify = { version = "0.11"}
+r2d2 = "0.8"
+scraper = "0.12"
+serde = { version = "1.0", features = ["derive"]}
+serde_json = "1.0"
+strsim = "0.10"
+thiserror = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "fs", "macros", "net"] }
+tokio-stream = { version = "0.1", featrues = ["net"]}
+tonic = { version = "0.6"}
+tower = "0.4"
+url = "2.2"
+
+[build-dependencies]
+tonic-build = { version = "0.6", features = ["prost"]}

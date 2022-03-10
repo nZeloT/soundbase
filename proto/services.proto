@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package soundbase;
+
+import "library.proto";
+import "tasks.proto";
+import "spotify.proto";

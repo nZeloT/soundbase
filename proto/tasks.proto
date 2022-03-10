@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package soundbase;
+
+service Tasks {
+    //Trigger Background Tasks
+    rpc FetchCharts(TasksBlank) returns (TasksBlank) {}
+    rpc FetchAlbumOfWeek(TasksBlank) returns (TasksBlank) {}
+    rpc UpdateFromSpotify(TasksBlank) returns (TasksBlank) {}
+}
+
+message TasksBlank {}

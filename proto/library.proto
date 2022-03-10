@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package soundbase;
+
+import "entities.proto";
+
+service Library {
+    //Library related methods
+    rpc Get (LibraryEntityRequest) returns (LibraryEntityResponse) {}
+    rpc List(ListEntitiesRequest) returns (stream SimpleLibraryEntityResponse) {}
+    rpc SetFavState(FavStateRequest) returns (Blank) {}
+}
+
+message LibraryEntityRequest {
+    LibraryEntities entity = 1;
+    int32 id = 2;
+}
+
+message ListEntitiesRequest {
+    LibraryEntities entity = 1;
+    int32 offset = 2;
+    int32 limit = 3;
+}
+
+message FavStateRequest {
+    LibraryEntityRequest entity = 1;
+    bool new_fav_state = 2;
+}
+
+message LibraryEntityResponse {
+    oneof library_entities {
+        FullArtist artist = 1;
+        FullAlbum album = 2;
+        FullTrack track = 3;
+    }
+}
+
+message SimpleLibraryEntityResponse {
+    oneof library_entities {
+        SimpleArtist artist = 1;
+        SimpleAlbum album = 2;
+        SimpleTrack track = 3;
+    }
+}
+
+message Blank {}
