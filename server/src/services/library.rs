@@ -9,13 +9,11 @@ use super::definition::{
     LibraryEntityResponse,
     SimpleLibraryEntityResponse,
     Blank,
-    library_entity_response,
-    simple_library_entity_response,
 };
 use crate::db_new;
 use crate::db_new::album::AlbumDb;
 use crate::db_new::artist::ArtistDb;
-use crate::db_new::{DbApi, FindById, SetFavedState};
+use crate::db_new::{DbApi, SetFavedState};
 use crate::db_new::album_artist::AlbumArtistsDb;
 use crate::db_new::models::{Album, Artist, Track};
 use crate::db_new::track::TrackDb;
@@ -30,7 +28,7 @@ pub struct LibraryService {
 impl Library for LibraryService {
     async fn get(&self, request: Request<LibraryEntityRequest>) -> Result<Response<LibraryEntityResponse>, Status> {
         use super::definition::library_entity_response::LibraryEntities;
-        use super::definition::{FullArtist, FullTrack, FullAlbum};
+        use super::definition::{FullArtist, FullTrack};
         let id: i32 = request.get_ref().id;
         match request.get_ref().entity() {
             super::definition::LibraryEntities::Artist => {

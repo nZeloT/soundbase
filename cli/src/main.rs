@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, Args};
 use tonic::Request;
 use url::Url;
 use warp::Filter;
@@ -22,7 +22,21 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    AuthSpotify
+    AuthSpotify,
+    Tasks(TasksParam)
+}
+
+#[derive(Args)]
+struct TasksParam {
+    #[clap(subcommand)]
+    subcommand : TaskCommands
+}
+
+#[derive(Subcommand)]
+enum TaskCommands {
+    AlbumOfWeek,
+    ChartsOfWeek,
+    SyncFromSpotify
 }
 
 
@@ -33,7 +47,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server_url = cli.server.clone();
 
     match &cli.command {
-        &Commands::AuthSpotify => do_spotify_auth(server_url).await
+        &Commands::AuthSpotify => do_spotify_auth(server_url).await,
+        Commands::Tasks(params) => {
+            match &params.subcommand {
+                TaskCommands::ChartsOfWeek => tasks::do_fetch_charts_of_week(server_url).await,
+                TaskCommands::AlbumOfWeek => tasks::do_fetch_album_of_week(server_url).await,
+                TaskCommands::SyncFromSpotify => tasks::do_sync_from_spotify(server_url).await
+            }
+        }
     }
 }
 
@@ -105,4 +126,30 @@ async fn handle_auth_callback(query: HashMap<String, String>, code_tx : tokio::s
     let _ = term_tx.send(()).await;
 
     Ok(warp::reply::reply())
+}
+
+mod tasks {
+    use tonic::Request;
+
+    pub async fn do_sync_from_spotify(server : String) -> Result<(), Box<dyn std::error::Error>> {
+        let mut tasks_client = super::services::tasks_client::TasksClient::connect(server).await?;
+        let _ = tasks_client.update_from_spotify(
+            Request::new(super::services::TasksBlank{})).await?;
+
+        Ok(())
+    }
+
+    pub async fn do_fetch_album_of_week(server : String) -> Result<(), Box<dyn std::error::Error>> {
+        let mut tasks_client = super::services::tasks_client::TasksClient::connect(server).await?;
+        let _ = tasks_client.fetch_album_of_week(
+            Request::new(super::services::TasksBlank{})).await?;
+        Ok(())
+    }
+
+    pub async fn do_fetch_charts_of_week(server : String) -> Result<(), Box<dyn std::error::Error>> {
+        let mut tasks_client = super::services::tasks_client::TasksClient::connect(server).await?;
+        let _ = tasks_client.fetch_charts(
+            Request::new(super::services::TasksBlank{})).await?;
+        Ok(())
+    }
 }

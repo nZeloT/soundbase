@@ -5,3 +5,4 @@ package soundbase;
 import "library.proto";
 import "tasks.proto";
 import "spotify.proto";
+import "proposals.proto";

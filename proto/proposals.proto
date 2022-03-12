@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package soundbase;
+
+service TrackFavourites {
+    rpc NewProposal(NewTrackFavouriteRequest) returns (NewTrackFavouritesResponse);
+    rpc Exists(ExistsTrackFavouriteRequest) returns (ExistsTrackFavouriteResponse);
+    rpc List(ListTrackFavouritesRequest) returns (stream TrackFavourite);
+    rpc Matches(ListTrackFavouritesMatchesRequest) returns (stream TrackFavouriteMatch);
+    rpc Confirm(ConfirmTrackFavouriteRequest) returns (TrackFavouritesBlank);
+    rpc Discard(DiscardTrackFavouritesRequest) returns (TrackFavouritesBlank);
+    rpc ExternalDiscard(ExternalDiscardTrackFavouritesRequest) returns (TrackFavouritesBlank);
+}
+
+message NewTrackFavouriteRequest {
+    string source_kind = 1;
+    string source_name = 2;
+    string source_raw  = 3;
+}
+
+message NewTrackFavouritesResponse {
+    NewTrackFavouritesState state = 1;
+}
+
+message ExistsTrackFavouriteRequest {
+    string source_kind   = 1;
+    string source_name = 2;
+    string source_raw  = 3;
+}
+
+message ListTrackFavouritesRequest {
+    int32 offset = 1;
+    int32 limit = 2;
+}
+
+message ListTrackFavouritesMatchesRequest {
+    int32 track_fav_id = 1;
+    string opt_search  = 2;
+}
+
+message ConfirmTrackFavouriteRequest {
+    int32 track_favourite_id = 1;
+    string match_id = 2;
+}
+
+message DiscardTrackFavouritesRequest {
+    int32 track_favourites_id = 1;
+}
+
+message ExternalDiscardTrackFavouritesRequest {
+    string source_kind   = 1;
+    string source_name = 2;
+    string source_raw  = 3;
+}
+
+message TrackFavourite {
+    int32 id = 1;
+    int32 opt_track_id = 2;
+    string source_name = 3;
+    string source_prop = 4;
+    string ext_track_title = 5;
+    string ext_artist_name = 6;
+    string ext_album_name  = 7;
+}
+
+message TrackFavouriteMatch {
+    string match_id = 1;
+    int32 track_favourite_id = 2;
+    string title = 3;
+    string album = 4;
+    int32 album_year = 5;
+    repeated string artists = 6;
+    float confidence = 7;
+}
+
+message ExistsTrackFavouriteResponse {
+    ExistsTrackFavouriteState state = 1;
+}
+
+enum ExistsTrackFavouriteState {
+    EXISTS_TRACK_FAVOURITE_STATE_UNSPECIFIED = 0;
+    EXISTS_TRACK_FAVOURITE_STATE_FOUND = 1;
+    EXISTS_TRACK_FAVOURITE_STATE_NOT_FOUND = 2;
+    EXISTS_TRACK_FAVOURITE_STATE_EXCLUDED = 3;
+}
+
+enum NewTrackFavouritesState {
+    NEW_TRACK_FAVOURITES_STATE_UNSPECIFIED = 0;
+    NEW_TRACK_FAVOURITES_STATE_CREATED = 1;
+    NEW_TRACK_FAVOURITES_STATE_EXCLUDED = 2;
+    NEW_TRACK_FAVOURITES_STATE_EXISTS = 3;
+}
+
+message TrackFavouritesBlank {}
