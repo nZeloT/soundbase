@@ -303,7 +303,9 @@ impl super::definition::SimpleTrack {
             track_id: db_track.track_id,
             title: db_track.title.clone(),
             album : Some(album),
-            artists
+            artists,
+            is_faved : db_track.is_faved,
+            duration_ms : db_track.duration_ms
         }
     }
 }

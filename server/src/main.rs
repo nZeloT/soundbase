@@ -37,7 +37,7 @@ mod string_utils;
 mod db_new;
 mod spotify;
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 4)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv::dotenv().ok();
     let url_env_val = dotenv::var("DATABASE_URL").expect("Failed to read ENV variable DATABASE_URL");

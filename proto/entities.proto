@@ -47,6 +47,8 @@ message SimpleTrack {
     string title = 2;
     SimpleAlbum album = 3;
     repeated SimpleArtist artists = 4;
+    bool is_faved = 5;
+    int64 duration_ms = 6;
 }
 
 enum LibraryEntities {
