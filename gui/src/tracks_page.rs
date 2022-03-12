@@ -6,6 +6,7 @@ use relm4::gtk::glib;
 use relm4::gtk::glib::clone;
 use relm4::gtk::prelude::{Cast, GObjectPropertyExpressionExt, ListModelExt, SelectionModelExt, StaticType};
 use relm4::gtk::Widget;
+use relm4::gtk::glib::signal::Inhibit;
 
 use crate::{AppModel, AppMsg};
 use crate::api::{AsyncLibraryHandler, AsyncLibraryHandlerMsg, AsyncLibraryKind};
@@ -16,9 +17,9 @@ use crate::api::services::SimpleTrack as ApiSimpleTrack;
 pub struct TracksPageModel {
     model: ListStore,
 
-    can_request : bool,
-    track_request_offset : i32,
-    track_count : i32
+    can_request: bool,
+    track_request_offset: i32,
+    track_count: i32,
 }
 
 pub enum TracksPageMsg {
@@ -28,17 +29,17 @@ pub enum TracksPageMsg {
     AddToQueue(i32),
 
     TriggerLoad,
-    AddApiTrack(ApiSimpleTrack)
+    AddApiTrack(ApiSimpleTrack),
 }
 
 pub struct TracksPageComponents {
-    async_api : RelmMsgHandler<AsyncLibraryHandler, TracksPageModel>
+    async_api: RelmMsgHandler<AsyncLibraryHandler, TracksPageModel>,
 }
 
 impl Components<TracksPageModel> for TracksPageComponents {
     fn init_components(parent_model: &TracksPageModel, parent_sender: Sender<TracksPageMsg>) -> Self {
-        Self{
-            async_api : RelmMsgHandler::new(parent_model, parent_sender)
+        Self {
+            async_api: RelmMsgHandler::new(parent_model, parent_sender)
         }
     }
 
@@ -56,9 +57,9 @@ impl ComponentUpdate<AppModel> for TracksPageModel {
         let model = ListStore::new(TrackRowData::static_type());
         Self {
             model,
-            can_request : true,
-            track_request_offset : 0,
-            track_count : 0
+            can_request: true,
+            track_request_offset: 0,
+            track_count: 0,
         }
     }
 
@@ -68,7 +69,7 @@ impl ComponentUpdate<AppModel> for TracksPageModel {
             TracksPageMsg::TriggerLoad => {
                 if !self.can_request {
                     println!("Requested all known tracks");
-                    return
+                    return;
                 }
                 println!("Requesting Tracks ...");
                 let receiver = components.async_api.sender();
@@ -78,26 +79,38 @@ impl ComponentUpdate<AppModel> for TracksPageModel {
                     .expect("Async Receiver Dropped!");
                 self.track_request_offset += 50;
                 self.can_request = false;
-            },
+            }
 
             TracksPageMsg::AddApiTrack(new_api_track) => {
                 println!("Received a new track on tracks page");
                 let album = new_api_track.album.unwrap();
+                let artists: Vec<(i32, String)> = new_api_track.artists.iter()
+                    .map(|simple_artist| (simple_artist.artist_id, simple_artist.name.clone()))
+                    .collect::<Vec<_>>();
                 self.model.append(&TrackRowData::new(
                     new_api_track.track_id,
                     &*new_api_track.title,
-                    album.album_id,
-                    &*album.name,
-                    true
+                    (album.album_id, &*album.name),
+                    artists,
+                    new_api_track.is_faved,
+                    new_api_track.duration_ms,
                 ));
                 self.track_count += 1;
                 self.can_request = self.track_count == self.track_request_offset;
-            },
+            }
 
-            TracksPageMsg::GoToArtist(artist_id) => {},
-            TracksPageMsg::GoToAlbum(album_id) => {},
-            TracksPageMsg::AddToQueue(track_id) => {},
-            TracksPageMsg::ToggleFavTrack(track_id) => {}
+            TracksPageMsg::GoToArtist(artist_id) => {
+                println!("Going to artist with id: {}", artist_id);
+            }
+            TracksPageMsg::GoToAlbum(album_id) => {
+                println!("Going to album with id: {}", album_id);
+            }
+            TracksPageMsg::AddToQueue(track_id) => {
+                println!("Adding Track with id {} to Queue", track_id);
+            }
+            TracksPageMsg::ToggleFavTrack(track_id) => {
+                println!("Toggel Fav State for track with id {}", track_id);
+            }
         }
     }
 }
@@ -139,7 +152,7 @@ impl Widgets<TracksPageModel, AppModel> for TracksPageWidgets {
             .build();
 
         let edge_sender = sender.clone();
-        scrolled_window.connect_edge_reached(move |_scrolled_window, _pos_type|{
+        scrolled_window.connect_edge_reached(move |_scrolled_window, _pos_type| {
             send!(edge_sender, TracksPageMsg::TriggerLoad);
         });
 
@@ -161,7 +174,7 @@ impl Widgets<TracksPageModel, AppModel> for TracksPageWidgets {
     }
 }
 
-fn create_track_row(item : &gtk::ListItem, sender : Sender<TracksPageMsg>) {
+fn create_track_row(item: &gtk::ListItem, sender: Sender<TracksPageMsg>) {
     let hbox = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(5)
@@ -202,28 +215,34 @@ fn create_track_row(item : &gtk::ListItem, sender : Sender<TracksPageMsg>) {
         .hexpand(true)
         .build();
 
-    let btn_artist = gtk::LinkButton::builder()
-        .label("Artist1")
-        .build();
-    btn_artist.set_halign(gtk::Align::Start);
+    let lbl_artists = gtk::Label::new(None);
+    lbl_artists.set_halign(gtk::Align::Start);
+    lbl_artists.set_use_markup(true);
     let artist_sender = sender.clone();
-    btn_artist.connect_clicked(clone!(@weak item => move |_btn|{
-        let artist_id = get_track_row_data(&item).get_artist_id();
+    lbl_artists.connect_activate_link(move |_label, url| {
+        let artist_id = match url.parse::<i32>() {
+            Ok(id) => id,
+            Err(e) => panic!("This should not happen! {:?}", e)
+        };
         artist_sender.send(TracksPageMsg::GoToArtist(artist_id)).unwrap();
-    }));
+        Inhibit(false)
+    });
 
-    let btn_album = gtk::LinkButton::builder()
-        .label("Album")
-        .build();
-    btn_album.set_halign(gtk::Align::Start);
+    let lbl_album = gtk::Label::new(Some("Album"));
+    lbl_album.set_use_markup(true);
+    lbl_album.set_halign(gtk::Align::Start);
     let album_sender = sender.clone();
-    btn_album.connect_clicked(clone!(@weak item => move |_btn| {
-        let album_id = get_track_row_data(&item).get_album_id();
+    lbl_album.connect_activate_link(move |_label, url| {
+        let album_id = match url.parse::<i32>() {
+            Ok(id) => id,
+            Err(e) => panic!("This should not happen! {:?}", e)
+        };
         album_sender.send(TracksPageMsg::GoToAlbum(album_id)).unwrap();
-    }));
+        Inhibit(false)
+    });
 
-    meta_detail_box.append(&btn_artist);
-    meta_detail_box.append(&btn_album);
+    meta_detail_box.append(&lbl_artists);
+    meta_detail_box.append(&lbl_album);
     meta_detail_box.set_valign(gtk::Align::Start);
     meta_box.append(&meta_detail_box);
     hbox.append(&meta_box);
@@ -233,7 +252,7 @@ fn create_track_row(item : &gtk::ListItem, sender : Sender<TracksPageMsg>) {
         .build();
     btn_box.set_class_active("linked", true);
 
-    let is_faved = gtk::Button::builder()
+    let is_faved = gtk::ToggleButton::builder()
         .icon_name("non-starred-symbolic")
         .valign(gtk::Align::Center)
         .build();
@@ -302,10 +321,30 @@ fn create_track_row(item : &gtk::ListItem, sender : Sender<TracksPageMsg>) {
 
     item
         .property_expression("item")
-        .chain_property::<TrackRowData>("albumName")
-        .bind(&btn_album, "label", Widget::NONE);
+        .chain_property::<TrackRowData>("albumFmt")
+        .bind(&lbl_album, "label", Widget::NONE);
+
+    item
+        .property_expression("item")
+        .chain_property::<TrackRowData>("artistFmt")
+        .bind(&lbl_artists, "label", Widget::NONE);
+
+    item
+        .property_expression("item")
+        .chain_property::<TrackRowData>("durationFmt")
+        .bind(&lbl_duration, "label", Widget::NONE);
+
+    item
+        .property_expression("item")
+        .chain_property::<TrackRowData>("favedIcon")
+        .bind(&is_faved, "icon-name", Widget::NONE);
+
+    item
+        .property_expression("item")
+        .chain_property::<TrackRowData>("faved")
+        .bind(&is_faved, "active", Widget::NONE);
 }
 
-fn get_track_row_data(item : &ListItem) -> TrackRowData {
+fn get_track_row_data(item: &ListItem) -> TrackRowData {
     item.item().unwrap().downcast::<TrackRowData>().unwrap()
 }

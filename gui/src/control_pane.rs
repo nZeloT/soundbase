@@ -33,7 +33,7 @@ impl Model for ControlPaneModel {
 
 impl ComponentUpdate<AppModel> for ControlPaneModel {
     fn init_model(parent_model: &AppModel) -> Self {
-        let current_track = TrackRowData::new(0, "Sweet Home Alabama", 0, "Second Helping", true);
+        let current_track = TrackRowData::new(0, "Sweet Home Alabama", (0, "Second Helping"), vec![(0, "Lynyrd Skynyrd".to_string())], true, 0);
         Self {
             current_track
         }
