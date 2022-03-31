@@ -16,6 +16,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod library_models;
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum UniversalId {
     Spotify(String),
@@ -85,39 +87,6 @@ impl RequestPage {
 
     fn _limit(limit: i64) -> i64 {
         if !(0..=50).contains(&limit) { 50 } else { limit }
-    }
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct ResponsePage {
-    offset: i32,
-    limit: i32,
-    next: Option<String>,
-    prev: Option<String>,
-}
-
-impl ResponsePage {
-    pub fn new(api: &str, page: &RequestPage, full_page: bool) -> Self {
-        let next = if full_page { Some(Self::_api_string(api, &page.next())) } else { None };
-        let prev = if page.offset() > 0 { Some(Self::_api_string(api, &page.prev())) } else { None };
-        Self {
-            offset: page.offset() as i32,
-            limit: page.limit() as i32,
-            next, prev,
-        }
-    }
-
-    fn _api_string(api: &str, page: &RequestPage) -> String {
-        let mut api = api.to_string();
-        if api.contains('?') {
-            api += "&offset=";
-        } else {
-            api += "?offset=";
-        }
-        api += &format!("{}", page.offset());
-        api += "&limit=";
-        api += &format!("{}", page.limit());
-        api
     }
 }
 

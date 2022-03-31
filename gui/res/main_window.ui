@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <template class="MainWindow" parent="AdwApplicationWindow">
+        <property name="default-width">1000</property>
+        <property name="default-height">600</property>
+        <property name="content">
+            <object class="GtkBox">
+                <property name="orientation">vertical</property>
+                <property name="vexpand">true</property>
+                <property name="hexpand">true</property>
+                <child>
+                    <object class="AdwHeaderBar">
+                        <property name="show_end_title_buttons">true</property>
+                        <property name="title-widget">
+                            <object class="AdwWindowTitle">
+                                <property name="title">Soundbase Client</property>
+                            </object>
+                        </property>
+                    </object>
+                </child>
+                <child>
+                    <!-- Main Content -->
+                    <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <property name="hexpand">true</property>
+                        <property name="vexpand">true</property>
+                        <child>
+                            <!-- Sidebar -->
+                            <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+                                <child>
+                                    <object class="GtkLabel">
+                                        <property name="label">Soundbase</property>
+                                        <property name="margin-top">20</property>
+                                        <property name="margin-bottom">20</property>
+                                        <property name="margin-start">20</property>
+                                        <property name="margin-end">20</property>
+                                        <style>
+                                            <class name="large-title"/>
+                                        </style>
+                                    </object>
+                                </child>
+                                <child>
+                                    <object class="GtkSeparator">
+                                        <property name="orientation">vertical</property>
+                                    </object>
+                                </child>
+                                <!-- Sidebar Main Sections -->
+                                <child>
+                                    <object class="GtkListBox" id="main_content_selector">
+                                        <property name="width-request">270</property>
+                                        <property name="selection-mode">browse</property>
+                                        <property name="valign">start</property>
+                                        <style>
+                                            <class name="navigation-sidebar"/>
+                                        </style>
+                                        <!-- Main Section Playback Entry -->
+                                        <child>
+                                            <object class="GtkBox">
+                                                <property name="orientation">horizontal</property>
+                                                <property name="vexpand">true</property>
+                                                <property name="halign">start</property>
+                                                <property name="name">playback</property>
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">Playback</property>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+
+                                        <!-- Main Section Discover Entry -->
+                                        <child>
+                                            <object class="GtkBox">
+                                                <property name="orientation">horizontal</property>
+                                                <property name="vexpand">true</property>
+                                                <property name="halign">start</property>
+                                                <property name="name">discover</property>
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">Discover</property>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+                                        <!-- Main Section Artists Entry -->
+                                        <child>
+                                            <object class="GtkBox">
+                                                <property name="orientation">horizontal</property>
+                                                <property name="vexpand">true</property>
+                                                <property name="halign">start</property>
+                                                <property name="name">artists</property>
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">Artists</property>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+                                        <!-- Main Section Albums Entry -->
+                                        <child>
+                                            <object class="GtkBox">
+                                                <property name="orientation">horizontal</property>
+                                                <property name="vexpand">true</property>
+                                                <property name="halign">start</property>
+                                                <property name="name">albums</property>
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">Albums</property>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+                                        <!-- Main Section Tracks Entry -->
+                                        <child>
+                                            <object class="GtkBox">
+                                                <property name="orientation">horizontal</property>
+                                                <property name="vexpand">true</property>
+                                                <property name="halign">start</property>
+                                                <property name="name">tracks</property>
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">Tracks</property>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+
+                                <!-- Separator between Sidebar Main and Playlist -->
+                                <child>
+                                    <object class="GtkSeparator">
+                                        <property name="orientation">vertical</property>
+                                    </object>
+                                </child>
+
+                                <!-- Sidebar Playlist Section Scrolled Window -->
+                                <child>
+                                    <object class="GtkScrolledWindow">
+                                        <property name="vexpand">true</property>
+                                        <child>
+                                            <!-- TODO: replace with custom ListBox to fill with playlist data -->
+                                            <object class="GtkListBox" id="playlist_selection">
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+                            </object>
+                            <!-- END Sidebar -->
+                        </child>
+
+                        <!-- Separate Sidebar from MainContent Stack -->
+                        <child>
+                            <object class="GtkSeparator">
+                                <property name="orientation">horizontal</property>
+                            </object>
+                        </child>
+
+                        <child>
+                            <object class="GtkStack" id="stack_pages">
+                                <property name="vexpand">true</property>
+                                <property name="vhomogeneous">true</property>
+                                <property name="visible-child-name">tracks</property>
+                                <child>
+                                    <!-- Playback Page -->
+                                    <object class="GtkStackPage" id="playback">
+                                        <property name="name">playback</property>
+                                        <property name="title">Playback</property>
+                                        <property name="child">
+                                            <object class="PlaybackPage" id="playback_page">
+                                            </object>
+                                        </property>
+                                    </object>
+                                </child>
+                                <child>
+                                    <!-- Discover Stack Page -->
+                                    <object class="GtkStackPage" id="discover">
+                                        <property name="name">discover</property>
+                                        <property name="title">Discover</property>
+                                        <property name="child">
+                                            <object class="GtkLabel">
+                                                <property name="label">Discover</property>
+                                            </object>
+                                        </property>
+                                    </object>
+                                </child>
+                                <child>
+                                    <!-- Artists Stack Page -->
+                                    <object class="GtkStackPage" id="artists">
+                                        <property name="name">artists</property>
+                                        <property name="title">Artists</property>
+                                        <property name="child">
+                                            <object class="GtkLabel">
+                                                <property name="label">Artists</property>
+                                            </object>
+                                        </property>
+                                    </object>
+                                </child>
+                                <child>
+                                    <!-- Albums Stack Page -->
+                                    <object class="GtkStackPage" id="albums">
+                                        <property name="name">albums</property>
+                                        <property name="title">Albums</property>
+                                        <property name="child">
+                                            <object class="GtkLabel">
+                                                <property name="label">Albums</property>
+                                            </object>
+                                        </property>
+                                    </object>
+                                </child>
+                                <child>
+                                    <!-- Tracks Stack Page -->
+                                    <object class="GtkStackPage" id="tracks">
+                                        <property name="name">tracks</property>
+                                        <property name="title">Tracks</property>
+                                        <property name="child">
+                                            <object class="ListTracksPage" id="list_tracks_page">
+                                            </object>
+                                        </property>
+                                    </object>
+
+                                </child>
+                            </object>
+                        </child>
+                    </object>
+                </child>
+
+                <!-- separator between main content and playback controls -->
+                <child>
+                    <object class="GtkSeparator">
+                        <property name="orientation">horizontal</property>
+                    </object>
+                </child>
+
+                <child>
+                    <object class="PlaybackPane" id="playback_pane">
+                    </object>
+                </child>
+            </object>
+        </property>
+    </template>
+</interface>

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <template class="ListTrackRow" parent="GtkBox">
+        <property name="orientation">horizontal</property>
+        <property name="spacing">5</property>
+        <property name="hexpand">true</property>
+        <property name="margin-top">2</property>
+        <property name="margin-bottom">2</property>
+        <property name="margin-start">2</property>
+        <property name="margin-end">2</property>
+
+        <child>
+            <object class="GtkStack" id="playback_action_stack">
+                <!--                <property name="visible-child-name">media-control</property>-->
+                <binding name="visible-child-name">
+                    <lookup name="action-stack-child">ListTrackRow</lookup>
+                </binding>
+                <child>
+                    <object class="GtkStackPage" id="album-art">
+                        <property name="name">album-art</property>
+                        <property name="title">album-art</property>
+                        <property name="child">
+                            <object class="GtkImage">
+                                <property name="name">album-art</property>
+                                <property name="icon-name">media-optical-symbolic</property>
+                            </object>
+                        </property>
+                    </object>
+                </child>
+                <child>
+                    <object class="GtkStackPage" id="media-control">
+                        <property name="name">media-control</property>
+                        <property name="title">media-control</property>
+                        <property name="child">
+                            <object class="GtkButton">
+                                <property name="name">media-control</property>
+                                <property name="icon-name">media-playback-start-symbolic</property>
+                                <property name="valign">center</property>
+                                <style>
+                                    <class name="flat"/>
+                                </style>
+                            </object>
+                        </property>
+                    </object>
+                </child>
+            </object>
+        </child>
+
+        <child>
+            <object class="GtkBox">
+                <property name="orientation">vertical</property>
+                <property name="spacing">5</property>
+                <property name="hexpand">true</property>
+                <child>
+                    <object class="GtkLabel">
+                        <!--                        <property name="label">Track Title</property>-->
+                        <binding name="label">
+                            <lookup name="title" type="TrackData">
+                                <lookup name="item" type="GtkListItem">
+                                    <lookup name="list-item">ListTrackRow</lookup>
+                                </lookup>
+                            </lookup>
+                        </binding>
+                        <property name="halign">start</property>
+                        <style>
+                            <class name="caption-heading"/>
+                        </style>
+                    </object>
+                </child>
+                <child>
+                    <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">5</property>
+                        <property name="hexpand">true</property>
+                        <child>
+                            <object class="GtkLabel">
+                                <binding name="label">
+                                    <lookup name="artistFmt" type="TrackData">
+                                        <lookup name="item" type="GtkListItem">
+                                            <lookup name="list-item">ListTrackRow</lookup>
+                                        </lookup>
+                                    </lookup>
+                                </binding>
+                                <property name="halign">start</property>
+                                <property name="use-markup">true</property>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="GtkLabel">
+                                <binding name="label">
+                                    <lookup name="albumFmt" type="TrackData">
+                                        <lookup name="item" type="GtkListItem">
+                                            <lookup name="list-item">ListTrackRow</lookup>
+                                        </lookup>
+                                    </lookup>
+                                </binding>
+                                <property name="use-markup">true</property>
+                                <property name="halign">start</property>
+                            </object>
+                        </child>
+                    </object>
+                </child>
+            </object>
+        </child>
+
+        <child>
+            <object class="GtkBox">
+                <property name="orientation">horizontal</property>
+                <style>
+                    <class name="linked"/>
+                </style>
+                <child>
+                    <object class="GtkToggleButton">
+                        <binding name="icon-name">
+                            <lookup name="favedIcon" type="TrackData">
+                                <lookup name="item" type="GtkListItem">
+                                    <lookup name="list-item">ListTrackRow</lookup>
+                                </lookup>
+                            </lookup>
+                        </binding>
+                        <property name="valign">center</property>
+                        <binding name="visible">
+                            <lookup name="is-highlighted">ListTrackRow</lookup>
+                        </binding>
+                    </object>
+                </child>
+                <child>
+                    <object class="GtkButton" id="queue_append">
+                        <property name="icon-name">list-add-symbolic</property>
+                        <property name="valign">center</property>
+                        <binding name="visible">
+                            <lookup name="is-highlighted">ListTrackRow</lookup>
+                        </binding>
+                    </object>
+                </child>
+                <child>
+                    <object class="GtkButton">
+                        <property name="icon-name">view-more-symbolic</property>
+                        <property name="valign">center</property>
+                        <binding name="visible">
+                            <lookup name="is-highlighted">ListTrackRow</lookup>
+                        </binding>
+                    </object>
+                </child>
+            </object>
+        </child>
+
+        <child>
+            <object class="GtkLabel">
+                <binding name="label">
+                    <lookup name="durationFmt" type="TrackData">
+                        <lookup name="item" type="GtkListItem">
+                            <lookup name="list-item">ListTrackRow</lookup>
+                        </lookup>
+                    </lookup>
+                </binding>
+                <property name="width-request">40</property>
+                <property name="halign">end</property>
+            </object>
+        </child>
+    </template>
+</interface>

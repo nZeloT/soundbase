@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <!-- define the track list store -->
+    <object class ="GListStore" id="queue_list">
+        <property name="item-type">TrackData</property>
+    </object>
+    <!-- define the selection mode and model -->
+    <object class="GtkSingleSelection" id="queue_selection_model">
+        <property name="model">queue_list</property>
+    </object>
+
+    <template class="PlaybackPage" parent="GtkBox">
+        <property name="orientation">vertical</property>
+        <property name="vexpand">true</property>
+        <property name="hexpand">true</property>
+        <child>
+            <object class="GtkScrolledWindow" id="scrolled_window">
+                <property name="min-content-width">400</property>
+                <property name="vexpand">true</property>
+                <property name="child">
+                    <object class="GtkBox">
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">10</property>
+                        <property name="margin-top">10</property>
+                        <property name="margin-bottom">10</property>
+                        <property name="margin-start">10</property>
+                        <property name="margin-end">10</property>
+                        <child>
+                            <object class="GtkBox">
+                                <property name="orientation">horizontal</property>
+                                <property name="spacing">5</property>
+                                <property name="valign">start</property>
+                                <child>
+                                    <object class="GtkLabel">
+                                        <property name="label">Playback Queue</property>
+                                        <property name="hexpand">true</property>
+                                        <style>
+                                            <class name="title-2" />
+                                        </style>
+                                    </object>
+                                </child>
+                                <child>
+                                    <object class="GtkButton" id="shuffle_queue">
+                                        <property name="icon-name">media-playlist-shuffle-symbolic</property>
+                                    </object>
+                                </child>
+                                <child>
+                                    <object class="GtkButton" id="refresh_queue">
+                                        <property name="label">Refresh</property>
+                                        <property name="icon-name">view-refresh-symbolic</property>
+                                    </object>
+                                </child>
+                            </object>
+                        </child>
+                        <child>
+                            <!-- the list view displaying the tracks -->
+                            <object class="GtkListView" id="queue_list_view">
+
+                                <!-- setting the selection model and therewith transitively the list store -->
+                                <property name="model">queue_selection_model</property>
+
+                                <!-- setting the widget factory to create the row widgets as needed -->
+                                <property name="factory">
+                                    <object class="GtkBuilderListItemFactory" id="queue_item_factory">
+                                        <property name="resource">/org/nzelot/soundbase-gui/list_track_row_item.ui</property>
+                                    </object>
+                                </property>
+                            </object>
+                        </child>
+                    </object>
+                </property>
+            </object>
+        </child>
+    </template>
+</interface>

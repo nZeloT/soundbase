@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+    <gresource prefix="/org/nzelot/soundbase-gui/">
+        <file compressed="true" preprocess="xml-stripblanks">main_window.ui</file>
+        <file compressed="true" preprocess="xml-stripblanks">playback_pane.ui</file>
+        <file compressed="true" preprocess="xml-stripblanks">list_tracks_page.ui</file>
+        <file compressed="true" preprocess="xml-stripblanks">playback_page.ui</file>
+        <file compressed="true" preprocess="xml-stripblanks">list_track_row_item.ui</file>
+        <file compressed="true" preprocess="xml-stripblanks">list_track_row.ui</file>
+    </gresource>
+</gresources>

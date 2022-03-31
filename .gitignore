@@ -2,3 +2,12 @@
 /nginx
 .idea/
 *.db
+.stignore
+.spotify_token_cache.json
+/.spot_cache
+.env
+Cargo.lock
+/tesseract*
+/test_data
+launch.json
+tasks.json

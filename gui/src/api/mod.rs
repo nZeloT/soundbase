@@ -1,144 +1,189 @@
-use tokio::runtime::Runtime;
-use tokio::runtime::Builder;
-use tokio::sync::mpsc;
-use mpsc::{Sender as TokioSender};
-use tonic::Request;
-use crate::tracks_page::TracksPageMsg;
-use crate::TracksPageModel;
-
-use services::{ListEntitiesRequest, LibraryEntities, SimpleLibraryEntityResponse, simple_library_entity_response, SimpleTrack};
+use adw::glib::Sender;
+use async_trait::async_trait;
+use tonic::codegen::StdError;
+use tonic::transport::{Endpoint, Error};
+use library_api::{LibraryEntity, LibraryRequests, LibraryResponse};
+use crate::api::api_base::{ApiBase, ApiClientBase, ApiTypes};
 
 pub mod services {
     tonic::include_proto!("soundbase");
 }
 
-type API = services::library_client::LibraryClient<tonic::transport::Channel>;
-pub struct AsyncLibraryHandler {
-    _rt : Runtime,
-    sender : TokioSender<AsyncLibraryHandlerMsg>
-}
+mod api_base;
+mod library_api;
+mod playback_api;
 
-#[derive(Debug)]
-pub enum AsyncLibraryHandlerMsg {
-    LoadPage(AsyncLibraryKind, i32, i32)
-}
+type LibraryClient = services::library_client::LibraryClient<tonic::transport::Channel>;
+type PlaybackClient = services::playback_controls_client::PlaybackControlsClient<tonic::transport::Channel>;
 
-#[derive(Debug)]
-pub enum AsyncLibraryKind {
-    Track
-}
+pub use api_base::ApiRuntime;
+use crate::api::playback_api::{PlaybackRequest, PlaybackResponse};
 
-impl relm4::MessageHandler<TracksPageModel> for AsyncLibraryHandler {
-    type Msg = AsyncLibraryHandlerMsg;
-    type Sender = TokioSender<AsyncLibraryHandlerMsg>;
+///
+/// Library API
+///
+#[derive(Clone, Debug)]
+pub struct LibraryApi(ApiBase<Self>);
 
-    fn init(_parent_model : &TracksPageModel, parent_sender : relm4::Sender<TracksPageMsg>) -> Self {
-        let api_target = match std::env::var("API_URL") {
-            Ok(url) => url,
-            Err(_) => "http://philly.local:3333".to_string()
-        };
-        println!("Found API target: '{:?}'", api_target);
-        let (sender, mut rx) = mpsc::channel::<AsyncLibraryHandlerMsg>(10);
-        let rt = Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
+#[async_trait]
+impl ApiTypes for LibraryApi {
+    type Request = LibraryRequests;
+    type Response = LibraryResponse;
+    type Client = LibraryClient;
 
-        rt.spawn(async move {
-            let api = services::library_client::LibraryClient::connect(api_target).await
-                .expect("Couldn't connect to API backend!");
-            println!("Connected to backend!");
-            while let Some(msg) = rx.recv().await {
-                let parent_sender = parent_sender.clone();
-                let mut _api = api.clone();
-                tokio::spawn(async move {
-                    //TODO handle message and send message using parent_sender
-                    println!("Handling async Message");
-                    match msg {
-                        AsyncLibraryHandlerMsg::LoadPage(kind, offset, limit) => {
-                            AsyncLibraryHandler::handle_load_page(
-                                &parent_sender, &mut _api, kind, offset, limit).await;
-                        }
-                    }
-                });
+    async fn process_request(glib_sender : gtk4::glib::Sender<Result<Self::Response, ApiError>>,
+                             api : Self::Client,
+                             request: Self::Request) {
+        match request {
+            LibraryRequests::LoadPage(entity, offset, limit) => {
+                log::info!("Async: Processing a Load Page Request");
+                library_api::process_page_request(glib_sender, api, entity, offset, limit).await;
             }
-            println!("Disconnected from backend");
-        });
-
-        AsyncLibraryHandler{
-            _rt : rt,
-            sender
         }
-    }
-
-    fn send(&self, msg : Self::Msg) {
-        self.sender.blocking_send(msg).unwrap();
-    }
-
-    fn sender(&self) -> Self::Sender {
-        self.sender.clone()
     }
 }
 
-impl AsyncLibraryHandler {
 
-    async fn handle_load_page(receiver : &relm4::Sender<TracksPageMsg>, api : &mut API,
-                              kind : AsyncLibraryKind, offset : i32, limit : i32) {
-        match kind {
-            AsyncLibraryKind::Track => {
-                AsyncLibraryHandler::handle_load_page_tracks(receiver, api, offset, limit).await;
+impl LibraryApi {
+    pub fn new(rt : ApiRuntime, api_address : String) -> Self {
+        Self(ApiBase::new(rt, api_address))
+    }
+
+    pub fn load_tracks<CB>(&self, offset : i32, limit : i32, callback : CB) -> Result<(), ApiError>
+    where CB : Fn(services::SimpleTrack) + 'static {
+        let request = LibraryRequests::LoadPage(LibraryEntity::Track, offset, limit);
+        self.0.request(request, move |response| {
+            match response {
+                LibraryResponse::Track(track) => callback(track),
+                _ => unimplemented!("Received response other than track for a Track Request!")
             }
-            //TODO: add further entities
+        })
+    }
+}
+
+#[async_trait]
+impl ApiClientBase for LibraryClient {
+    async fn connect<D>(dst: D) -> Result<Self, Error>
+        where D: TryInto<Endpoint>,
+              D::Error: Into<StdError>,
+              D: Send {
+        LibraryClient::connect(dst).await
+    }
+}
+
+///
+/// Playback Controls API
+///
+#[derive(Clone, Debug)]
+pub struct PlaybackApi(ApiBase<Self>);
+
+#[async_trait]
+impl ApiTypes for PlaybackApi {
+    type Request = PlaybackRequest;
+    type Response = PlaybackResponse;
+    type Client = PlaybackClient;
+
+    async fn process_request(glib_tx: Sender<Result<Self::Response, ApiError>>,
+                             api: Self::Client,
+                             request: Self::Request) {
+        match request {
+            PlaybackRequest::Play => playback_api::play(glib_tx, api).await,
+            PlaybackRequest::Pause => playback_api::pause(glib_tx, api).await,
+            PlaybackRequest::Next => playback_api::next(glib_tx, api).await,
+            PlaybackRequest::Previous => playback_api::previous(glib_tx, api).await,
+            PlaybackRequest::Seek(pos) => playback_api::seek(glib_tx, api, pos).await,
+
+            PlaybackRequest::Shuffle => playback_api::shuffle(glib_tx, api).await,
+            PlaybackRequest::Looping(mode) => playback_api::looping(glib_tx, api, mode).await,
+
+            PlaybackRequest::CurrentState => playback_api::current_state(glib_tx, api).await,
+
+            PlaybackRequest::QueueLoad(offset, limit) => playback_api::queue_load(glib_tx, api, offset, limit).await,
+            PlaybackRequest::QueueAppend(track) => playback_api::queue_append(glib_tx, api, track).await,
+            PlaybackRequest::QueuePrepend(track) => playback_api::queue_prepend(glib_tx, api, track).await,
+            PlaybackRequest::QueueRemove(pos) => playback_api::queue_remove(glib_tx, api, pos).await,
+            PlaybackRequest::QueueClear => playback_api::queue_clear(glib_tx, api).await,
         }
     }
+}
 
-    async fn handle_load_page_tracks(receiver : &relm4::Sender<TracksPageMsg>, api : &mut API,
-                                     offset : i32, limit : i32) {
-
-        let result = api.list(Request::new(ListEntitiesRequest{
-            entity: LibraryEntities::Track as i32,
-            offset,
-            limit
-        })).await;
-
-        match result {
-            Ok(r) => {
-                let mut stream = r.into_inner();
-                loop {
-                    let msg = stream.message().await;
-                    match msg {
-                        Ok(m) => {
-                            match m {
-                                Some(response) => {
-                                    let simple_track = AsyncLibraryHandler::unpack_simple_track(response);
-                                    println!("Sending Track to Tracks Page: '{:?}'", simple_track);
-                                    relm4::send!(receiver, TracksPageMsg::AddApiTrack(simple_track))
-                                },
-                                None => {
-                                    // Stream was terminated gracefully as everything wa received
-                                    print!("Reached Stream End");
-                                    break;
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            println!("Stream terminated with '{:?}'", e);
-                            break; //terminate loop
-                        }
-                    }
-                }
-            },
-            Err(e) => panic!("Error fetching from backend! {:?}", e)
-        }
+impl PlaybackApi {
+    pub fn new(rt : ApiRuntime, address : String) -> Self {
+        Self(ApiBase::new(rt, address))
     }
 
-    fn unpack_simple_track(response : SimpleLibraryEntityResponse) -> SimpleTrack {
-        let entity_response = response
-            .library_entities
-            .unwrap();
-        match entity_response {
-            simple_library_entity_response::LibraryEntities::Track(simple_track) => simple_track,
-            _ => unimplemented!()
-        }
+    pub fn queue_load<CB>(&self, offset : i32, limit : i32, callback : CB) -> Result<(), ApiError>
+    where CB : Fn(services::SimpleTrack) + 'static {
+        let request = PlaybackRequest::QueueLoad(offset, limit);
+        self.0.request(request, move |response| {
+            match response {
+                PlaybackResponse::QueueTrack(track) => callback(track),
+                _ => unimplemented!("Received something other than Track for Queue Load!")
+            }
+        })
+    }
+
+    pub fn queue_append<CB>(&self, track_id : i32, callback : CB) -> Result<(), ApiError>
+    where CB : Fn() + 'static {
+        let request = PlaybackRequest::QueueAppend(track_id);
+        self.0.request(request, move |response| {
+            match response {
+                PlaybackResponse::ActionConfirmed => callback(),
+                _ => unimplemented!("Received something other than ActionConfirmed for Queue Add!")
+            }
+        })
+    }
+
+    pub fn play<CB>(&self, callback : CB) -> Result<(), ApiError>
+    where CB : Fn(services::PlaybackStateResponse) + 'static {
+        self.0.request(PlaybackRequest::Play, move |response| {
+            match response {
+                PlaybackResponse::CurrentState(state) => callback(state),
+                _ => unimplemented!("Received something other than CurrentState for Play!")
+            }
+        })
+    }
+
+    pub fn pause<CB>(&self, callback : CB) -> Result<(), ApiError>
+    where CB : Fn(services::PlaybackStateResponse) + 'static {
+        self.0.request(PlaybackRequest::Pause, move |response| {
+            match response {
+                PlaybackResponse::CurrentState(state) => callback(state),
+                _ => unimplemented!("Received something other than CurrentState for Pause!")
+            }
+        })
+    }
+
+    pub fn current_state<CB>(&self, callback : CB) -> Result<(), ApiError>
+    where CB : Fn(services::PlaybackStateResponse) + 'static {
+        self.0.request(PlaybackRequest::CurrentState, move |response| {
+            match response {
+                PlaybackResponse::CurrentState(state) => callback(state),
+                _ => unimplemented!("received something other than Current State for Current State!")
+            }
+        })
+    }
+}
+
+#[async_trait]
+impl ApiClientBase for PlaybackClient {
+    async fn connect<D>(dst: D) -> Result<Self, Error>
+        where D: TryInto<Endpoint>,
+              D::Error: Into<StdError>,
+              D: Send {
+        PlaybackClient::connect(dst).await
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ApiError {
+    Send(String),
+
+    Request(String),
+}
+
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for ApiError {
+    fn from(e : tokio::sync::mpsc::error::SendError<T>) -> Self {
+        Self::Send(e.to_string())
     }
 }

@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package soundbase;
+
+import "entities.proto";
+
+service PlaybackControls {
+    rpc GetQueue(GetQueueRequest) returns (stream SimpleTrack);
+    rpc AppendToQueue(ToQueueRequest) returns (PlaybackBlank);
+    rpc PrependToQueue(ToQueueRequest) returns (PlaybackBlank);
+    rpc RemoveFromQueue(RemoveFromQueueRequest) returns (PlaybackBlank);
+    rpc ClearQueue(PlaybackBlank) returns (PlaybackBlank);
+
+    rpc Play(PlaybackBlank) returns (PlaybackStateResponse);
+    rpc Pause(PlaybackBlank) returns (PlaybackStateResponse);
+    rpc Next(PlaybackBlank) returns (PlaybackStateResponse);
+    rpc Previous(PlaybackBlank) returns (PlaybackStateResponse);
+    rpc Seek(PlaybackSeekRequest) returns (PlaybackStateResponse);
+    
+    rpc SetShuffle(PlaybackSetShuffleRequest) returns (PlaybackBlank);
+    rpc SetLooping(PlaybackSetLoopingRequest) returns (PlaybackStateResponse);
+    
+    rpc CurrentState(PlaybackBlank) returns (PlaybackStateResponse); 
+}
+
+message PlaybackBlank {};
+message GetQueueRequest {
+    int32 offset = 1;
+    int32 limit = 2;
+}
+message ToQueueRequest {
+    int32 track_id = 1;
+}
+
+message RemoveFromQueueRequest {
+    int32 queue_position = 1;
+}
+
+message PlaybackSeekRequest {
+    int64 target_position_ms = 1;
+}
+
+message PlaybackSetShuffleRequest {
+    bool target_state = 1;
+}
+
+message PlaybackSetLoopingRequest {
+    PlaybackLoopStates target_state = 1;
+}
+
+message PlaybackStateResponse {
+    bool is_playing = 1;
+    bool has_previous = 2;
+    bool has_next = 3;
+    PlaybackLoopStates loop_state = 5;
+    int64 playback_position_ms = 6;
+    SimpleTrack playing_track = 7;
+}
+
+enum PlaybackLoopStates {
+    PLAYBACK_LOOP_STATES_UNSPECIFIED = 0;
+    PLAYBACK_LOOP_STATES_OFF = 1;
+    PLAYBACK_LOOP_STATES_ALL = 2;
+    PLAYBACK_LOOP_STATES_ONE = 3;
+}

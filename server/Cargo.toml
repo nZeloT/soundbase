@@ -12,12 +12,16 @@ name = "soundbase-server"
 path = "src/main.rs"
 
 [dependencies]
+async-trait = "0.1"
 chrono = "0.4"
 diesel = { version = "1.4", features = ["postgres", "r2d2", "chrono"]}
 dotenv = "0.15.0"
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 http = "0.2"
 itertools = "0.10"
+librespot = "0.3"
+log = "0.4"
+pretty_env_logger = "0.4"
 prost = "0.9"
 prost-types = "0.9"
 regex = "1.5"

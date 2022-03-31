@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <template class="PlaybackPane" parent="GtkBox">
+        <property name="orientation">horizontal</property>
+        <property name="height-request">96</property>
+        <child>
+            <!--  Metadata -->
+            <object class="GtkStack" id="metadata_stack">
+                <property name="vhomogeneous">true</property>
+                <property name="hhomogeneous">true</property>
+                <child>
+                    <object class="GtkStackPage" id="has_current_track">
+                        <property name="name">has_current_track</property>
+                        <property name="title">has_current_track</property>
+                        <property name="child">
+
+                            <object class="GtkBox" id="current_track_metadata">
+                                <property name="orientation">horizontal</property>
+                                <property name="valign">center</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-end">5</property>
+                                <child>
+                                    <object class="GtkButton" id="current_track_album_art">
+                                        <property name="icon-name">media-optical-symbolic</property>
+                                        <property name="valign">center</property>
+                                        <property name="width-request">50</property>
+                                        <property name="height-request">50</property>
+                                        <style>
+                                            <class name="flat"/>
+                                        </style>
+                                    </object>
+                                </child>
+                                <child>
+                                    <object class="GtkBox">
+                                        <property name="orientation">vertical</property>
+                                        <property name="valign">center</property>
+                                        <property name="spacing">3</property>
+                                        <property name="margin-start">10</property>
+                                        <child>
+                                            <object class="GtkLabel" id="current_track_title">
+                                                <property name="use-markup">true</property>
+                                                <property name="halign">start</property>
+                                                <property name="max-width-chars">100</property>
+                                                <property name="ellipsize">end</property>
+                                                <style>
+                                                    <class name="caption-heading"/>
+                                                </style>
+                                                <property name="label">Title</property>
+                                                <binding name="label">
+                                                    <lookup name="title" type="TrackData">
+                                                        <lookup name="current-track" type="PlaybackState">
+                                                            <lookup name="state">PlaybackPane</lookup>
+                                                        </lookup>
+                                                    </lookup>
+                                                </binding>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class="GtkLabel" id="current_track_artists">
+                                                <property name="use-markup">true</property>
+                                                <property name="halign">start</property>
+                                                <property name="label">Artists</property>
+                                                <property name="max-width-chars">100</property>
+                                                <property name="ellipsize">end</property>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+                                <child>
+                                    <object class="GtkToggleButton" id="current_track_faved">
+                                        <property name="icon-name">non-starred-symbolic</property>
+                                        <property name="valign">center</property>
+                                        <style>
+                                            <class name="flat"/>
+                                        </style>
+                                    </object>
+                                </child>
+                            </object>
+
+                        </property>
+                    </object>
+                </child>
+                <child>
+                    <object class="GtkStackPage" id="has_no_track">
+                        <property name="name">has_no_track</property>
+                        <property name="title">has_no_track</property>
+                        <property name="child">
+                            <object class="GtkStack">
+                            </object>
+                        </property>
+                    </object>
+                </child>
+            </object>
+
+        </child>
+
+        <child>
+            <!-- Playback Controls -->
+            <object class="GtkBox">
+                <property name="orientation">vertical</property>
+                <property name="valign">center</property>
+                <child>
+                    <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <property name="spacing">10</property>
+                        <property name="hexpand">true</property>
+                        <property name="halign">center</property>
+                        <child>
+                            <object class="GtkButton" id="playback_previous">
+                                <property name="icon-name">media-skip-backward-symbolic</property>
+                                <property name="valign">center</property>
+                                <style>
+                                    <class name="flat"/>
+                                </style>
+                                <binding name="can-target">
+                                    <lookup name="has-previous" type="PlaybackState">
+                                        <lookup name="state">PlaybackPane</lookup>
+                                    </lookup>
+                                </binding>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="GtkButton" id="playback_play_pause">
+<!--                                <property name="icon-name">media-playback-start-symbolic</property>-->
+                                <binding name="icon-name">
+                                    <lookup name="playing-icon" type="PlaybackState">
+                                        <lookup name="state">PlaybackPane</lookup>
+                                    </lookup>
+                                </binding>
+                                <property name="width-request">48</property>
+                                <property name="height-request">48</property>
+                                <property name="valign">center</property>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="GtkButton" id="playback_next">
+                                <property name="icon-name">media-skip-forward-symbolic</property>
+                                <property name="valign">center</property>
+                                <style>
+                                    <class name="flat"/>
+                                </style>
+                                <binding name="can-target">
+                                    <lookup name="has-next" type="PlaybackState">
+                                        <lookup name="state">PlaybackPane</lookup>
+                                    </lookup>
+                                </binding>
+                            </object>
+                        </child>
+                    </object>
+                </child>
+                <child>
+                    <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <property name="hexpand">true</property>
+                        <child type="start">
+                            <object class="GtkLabel" id="playback_time_passed">
+                                <property name="label">0:00</property>
+                            </object>
+                        </child>
+                        <child type="center">
+                            <object class="GtkScale" id="playback_seeking">
+                                <property name="orientation">horizontal</property>
+                                <property name="hexpand">true</property>
+                                <property name="adjustment">
+                                    <object class="GtkAdjustment">
+                                        <property name="upper">1</property>
+                                        <property name="lower">0</property>
+                                        <property name="value">0</property>
+                                    </object>
+                                </property>
+                            </object>
+                        </child>
+                        <child type="end">
+                            <object class="GtkLabel" id="playback_time_total">
+                                <property name="label">8:24</property>
+                            </object>
+                        </child>
+                    </object>
+                </child>
+            </object>
+        </child>
+
+        <child>
+            <!-- Quick Access Controls -->
+            <object class="GtkBox">
+                <property name="orientation">horizontal</property>
+                <property name="margin-start">10</property>
+                <property name="margin-end">10</property>
+                <property name="spacing">5</property>
+                <child>
+                    <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <style>
+                            <class name="linked"/>
+                        </style>
+                        <child>
+                            <object class="GtkToggleButton">
+                                <property name="icon-name">drive-multidisk-symbolic</property>
+                                <property name="valign">center</property>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="GtkToggleButton">
+                                <property name="icon-name">audio-volume-high-symbolic</property>
+                                <property name="valign">center</property>
+                            </object>
+                        </child>
+                    </object>
+                </child>
+                <child>
+                    <object class="GtkScale">
+                        <property name="orientation">horizontal</property>
+                        <property name="width-request">96</property>
+                        <property name="adjustment">
+                            <object class="GtkAdjustment">
+                                <property name="upper">1</property>
+                                <property name="lower">0</property>
+                                <property name="value">1</property>
+                                <property name="step-increment">0.1</property>
+                            </object>
+                        </property>
+                    </object>
+                </child>
+            </object>
+        </child>
+    </template>
+</interface>
