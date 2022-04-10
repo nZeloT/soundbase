@@ -17,7 +17,7 @@ impl LocalPlayer{
 
 #[async_trait]
 impl Player for LocalPlayer {
-    async fn connect_track_end_notify(&mut self, tx: tokio::sync::mpsc::UnboundedSender<()>) {
+    async fn connect_player_events(&mut self, tx: tokio::sync::mpsc::UnboundedSender<super::PlayerEvent>) {
         todo!()
     }
 

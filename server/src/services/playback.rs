@@ -9,6 +9,7 @@ use crate::playback::{LoopingStates, PlaybackController, PlaybackState, Playback
 use super::definition::{
     GetQueueRequest,
     PlaybackBlank,
+    PlaybackTrackRequest,
     PlaybackLoopStates,
     PlaybackSeekRequest,
     PlaybackSetLoopingRequest,
@@ -49,7 +50,7 @@ impl PlaybackControls for PlaybackControlsService {
 
     async fn append_to_queue(&self, request: Request<ToQueueRequest>) -> Result<Response<PlaybackBlank>, Status> {
         let track_id = request.get_ref().track_id;
-        println!("Trying to add Track {} to queue", track_id);
+        log::info!("Trying to add Track {} to queue", track_id);
         match self.playback.read().await.queue().append(track_id).await {
             Ok(_) => Ok(Response::new(PlaybackBlank {})),
             Err(e) => Err(Status::internal(e.to_string()))
@@ -81,6 +82,14 @@ impl PlaybackControls for PlaybackControlsService {
     /// Playback Control Functions
     ///
 
+    async fn play_track(&self, request : Request<PlaybackTrackRequest>) -> Result<Response<PlaybackStateResponse>, Status> {
+        let track_id = request.get_ref().track_id;
+        match self.playback.read().await.play_directly(track_id).await {
+            Ok(_) => Ok(Response::new(PlaybackStateResponse::from(&self.playback.read().await.get_state().await))),
+            Err(e) => Err(Status::internal(e.to_string()))
+        }
+    }
+
     async fn play(&self, _request: Request<PlaybackBlank>) -> Result<Response<PlaybackStateResponse>, Status> {
         let result = {
             self.playback.write().await.start_playback().await
@@ -104,7 +113,10 @@ impl PlaybackControls for PlaybackControlsService {
     }
 
     async fn next(&self, _request: Request<PlaybackBlank>) -> Result<Response<PlaybackStateResponse>, Status> {
-        unimplemented!()
+        match self.playback.read().await.next_track().await {
+            Ok(_) => Ok(Response::new(PlaybackStateResponse::from(&self.playback.read().await.get_state().await))),
+            Err(e) => Err(Status::internal(e.to_string()))
+        }
     }
 
     async fn previous(&self, _request: Request<PlaybackBlank>) -> Result<Response<PlaybackStateResponse>, Status> {
@@ -132,6 +144,33 @@ impl PlaybackControls for PlaybackControlsService {
             self.playback.read().await.get_state().await
         };
         Ok(Response::new(PlaybackStateResponse::from(&state)))
+    }
+
+    type StateUpdatesStream = ReceiverStream<Result<PlaybackStateResponse, Status>>;
+    async fn state_updates(&self, _request : Request<PlaybackBlank>) -> Result<Response<Self::StateUpdatesStream>, Status> {
+        use tokio::sync::mpsc::{Receiver, Sender};
+
+        let mut state_rx = self.playback.read().await.state_update_rx();
+
+        let (tx, rx) : (Sender<Result<PlaybackStateResponse, Status>>,Receiver<Result<PlaybackStateResponse, Status>>) = tokio::sync::mpsc::channel(10);
+        tokio::spawn(async move {
+
+            // Async Channel aus Spot Player -> Playback Controller
+            // Async Broadcast aus Playback Controller -> an alle bekannten receiver
+            // Async Channel pro Broadcast Receiver -> Tonic Response
+            log::info!("Connected new State Update Receiver!");
+            while state_rx.changed().await.is_ok() {
+                let state = state_rx.borrow().clone();
+                let resp = PlaybackStateResponse::from(&state);
+                log::info!("Sending State Update using Tonic! {:?}", resp);
+                tx.send(Ok(resp))
+                    .await
+                    .expect("Failed to send State Update to tonic client stream!");
+            }
+            log::info!("State Update Channel was closed!");
+        });
+
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 }
 
@@ -165,7 +204,6 @@ impl From<&PlaybackState> for PlaybackStateResponse {
             has_previous : state.has_previous,
             has_next : state.has_next,
             loop_state : PlaybackLoopStates::from(&state.looping_state) as i32,
-            playback_position_ms : state.playback_position_ms,
             playing_track : map_opt_playback_track(&state.current_track)
         }
     }

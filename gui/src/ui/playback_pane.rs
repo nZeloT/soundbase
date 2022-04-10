@@ -4,6 +4,7 @@ use gtk4::subclass::prelude::ObjectSubclassIsExt;
 
 use crate::api::services::PlaybackStateResponse;
 use crate::model::playback_state::PlaybackState;
+use crate::utils;
 
 mod imp {
     use std::cell::{RefCell};
@@ -102,6 +103,9 @@ mod imp {
             self.playback_play_pause.connect_clicked(glib::clone!(@weak obj => move |_btn|{
                 obj.toggle_playback_state();
             }));
+            self.playback_next.connect_clicked(glib::clone!(@weak obj => move |_btn| {
+                obj.next_track();
+            }));
             self.parent_constructed(obj);
         }
     }
@@ -123,6 +127,7 @@ impl PlaybackPane {
     }
 
     pub fn update_state(&self, state_update : &PlaybackStateResponse) {
+        log::info!("Received Playback State Update {:?}", state_update);
         let state = self.imp().playback_state.borrow();
         state.set_is_playing(state_update.is_playing);
         state.set_has_previous(state_update.has_previous);
@@ -151,17 +156,22 @@ impl PlaybackPane {
     }
 
     fn start_playback(&self) {
-        self.activate_action("app.playback-start", None)
+        self.activate_action(utils::ApplicationActions::Play.call(), None)
             .expect("Failed to activate playback-start Action!");
     }
 
     fn pause_playback(&self) {
-        self.activate_action("app.playback-pause", None)
+        self.activate_action(utils::ApplicationActions::Pause.call(), None)
             .expect("Failed to activate playback-pause Action!");
     }
 
+    fn next_track(&self) {
+        self.activate_action(utils::ApplicationActions::Next.call(), None)
+            .expect("Failed to activate Next Track Action!");
+    }
+
     fn trigger_state_update(&self) {
-        self.activate_action("app.update-playback-state", None)
+        self.activate_action(utils::ApplicationActions::UpdateState.call(), None)
             .expect("Failed to activate Update Playback State Action!");
     }
 }

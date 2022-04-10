@@ -87,6 +87,7 @@ impl ApiTypes for PlaybackApi {
                              api: Self::Client,
                              request: Self::Request) {
         match request {
+            PlaybackRequest::PlayTrack(track) => playback_api::play_track(glib_tx, api, track).await,
             PlaybackRequest::Play => playback_api::play(glib_tx, api).await,
             PlaybackRequest::Pause => playback_api::pause(glib_tx, api).await,
             PlaybackRequest::Next => playback_api::next(glib_tx, api).await,
@@ -97,6 +98,7 @@ impl ApiTypes for PlaybackApi {
             PlaybackRequest::Looping(mode) => playback_api::looping(glib_tx, api, mode).await,
 
             PlaybackRequest::CurrentState => playback_api::current_state(glib_tx, api).await,
+            PlaybackRequest::StateUpdates => playback_api::state_updates(glib_tx, api).await,
 
             PlaybackRequest::QueueLoad(offset, limit) => playback_api::queue_load(glib_tx, api, offset, limit).await,
             PlaybackRequest::QueueAppend(track) => playback_api::queue_append(glib_tx, api, track).await,
@@ -144,6 +146,16 @@ impl PlaybackApi {
         })
     }
 
+    pub fn play_track<CB>(&self, track_id : i32, callback : CB) -> Result<(), ApiError> 
+    where CB : Fn(services::PlaybackStateResponse) + 'static {
+        self.0.request(PlaybackRequest::PlayTrack(track_id), move |response| {
+            match response {
+                PlaybackResponse::CurrentState(state) => callback(state),
+                _ => unimplemented!("Received something other than CurrentState for PlayTrack!")
+            }
+        })
+    }
+
     pub fn pause<CB>(&self, callback : CB) -> Result<(), ApiError>
     where CB : Fn(services::PlaybackStateResponse) + 'static {
         self.0.request(PlaybackRequest::Pause, move |response| {
@@ -154,12 +166,32 @@ impl PlaybackApi {
         })
     }
 
+    pub fn next<CB>(&self, callback : CB) -> Result<(), ApiError> 
+    where CB : Fn(services::PlaybackStateResponse) + 'static {
+        self.0.request(PlaybackRequest::Next, move |response| {
+            match response {
+                PlaybackResponse::CurrentState(state) => callback(state),
+                _ => unimplemented!("Received something other than CurrentState for Next Track!")
+            }
+        })
+    }
+
     pub fn current_state<CB>(&self, callback : CB) -> Result<(), ApiError>
     where CB : Fn(services::PlaybackStateResponse) + 'static {
         self.0.request(PlaybackRequest::CurrentState, move |response| {
             match response {
                 PlaybackResponse::CurrentState(state) => callback(state),
                 _ => unimplemented!("received something other than Current State for Current State!")
+            }
+        })
+    }
+
+    pub fn connect_state_update_notify<CB>(&self, callback : CB) -> Result<(), ApiError>
+    where CB : Fn(services::PlaybackStateResponse) + 'static {
+        self.0.request(PlaybackRequest::StateUpdates, move |response| {
+            match response {
+                PlaybackResponse::CurrentState(state) => callback(state),
+                _ => unimplemented!("received something other than Current State for State Updates!")
             }
         })
     }

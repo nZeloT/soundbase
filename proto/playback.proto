@@ -11,6 +11,7 @@ service PlaybackControls {
     rpc RemoveFromQueue(RemoveFromQueueRequest) returns (PlaybackBlank);
     rpc ClearQueue(PlaybackBlank) returns (PlaybackBlank);
 
+    rpc PlayTrack(PlaybackTrackRequest) returns (PlaybackStateResponse);
     rpc Play(PlaybackBlank) returns (PlaybackStateResponse);
     rpc Pause(PlaybackBlank) returns (PlaybackStateResponse);
     rpc Next(PlaybackBlank) returns (PlaybackStateResponse);
@@ -20,7 +21,8 @@ service PlaybackControls {
     rpc SetShuffle(PlaybackSetShuffleRequest) returns (PlaybackBlank);
     rpc SetLooping(PlaybackSetLoopingRequest) returns (PlaybackStateResponse);
     
-    rpc CurrentState(PlaybackBlank) returns (PlaybackStateResponse); 
+    rpc CurrentState(PlaybackBlank) returns (PlaybackStateResponse);
+    rpc StateUpdates(PlaybackBlank) returns (stream PlaybackStateResponse);
 }
 
 message PlaybackBlank {};
@@ -29,6 +31,10 @@ message GetQueueRequest {
     int32 limit = 2;
 }
 message ToQueueRequest {
+    int32 track_id = 1;
+}
+
+message PlaybackTrackRequest {
     int32 track_id = 1;
 }
 
@@ -53,7 +59,6 @@ message PlaybackStateResponse {
     bool has_previous = 2;
     bool has_next = 3;
     PlaybackLoopStates loop_state = 5;
-    int64 playback_position_ms = 6;
     SimpleTrack playing_track = 7;
 }
 

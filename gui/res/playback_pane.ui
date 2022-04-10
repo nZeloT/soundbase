@@ -60,6 +60,13 @@
                                                 <property name="use-markup">true</property>
                                                 <property name="halign">start</property>
                                                 <property name="label">Artists</property>
+                                                <binding name="label">
+                                                    <lookup name="artistFmt" type="TrackData">
+                                                        <lookup name="current-track" type="PlaybackState">
+                                                            <lookup name="state">PlaybackPane</lookup>
+                                                        </lookup>
+                                                    </lookup>
+                                                </binding>
                                                 <property name="max-width-chars">100</property>
                                                 <property name="ellipsize">end</property>
                                             </object>
@@ -69,6 +76,13 @@
                                 <child>
                                     <object class="GtkToggleButton" id="current_track_faved">
                                         <property name="icon-name">non-starred-symbolic</property>
+                                        <binding name="icon-name">
+                                            <lookup name="favedIcon" type="TrackData">
+                                                <lookup name="current-track" type="PlaybackState">
+                                                    <lookup name="state">PlaybackPane</lookup>
+                                                </lookup>
+                                            </lookup>
+                                        </binding>
                                         <property name="valign">center</property>
                                         <style>
                                             <class name="flat"/>

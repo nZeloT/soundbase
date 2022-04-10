@@ -32,8 +32,8 @@
                         <property name="name">media-control</property>
                         <property name="title">media-control</property>
                         <property name="child">
-                            <object class="GtkButton">
-                                <property name="name">media-control</property>
+                            <object class="GtkButton" id="play_track">
+                                <property name="name">play-track</property>
                                 <property name="icon-name">media-playback-start-symbolic</property>
                                 <property name="valign">center</property>
                                 <style>

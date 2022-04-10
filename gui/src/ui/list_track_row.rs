@@ -3,6 +3,7 @@ use glib::Object;
 use gtk4::prelude::{ObjectExt, ToVariant};
 use gtk4::traits::WidgetExt;
 use crate::model::track_data::TrackData;
+use crate::utils;
 
 mod imp {
     use std::borrow::Borrow;
@@ -31,6 +32,9 @@ mod imp {
 
         #[template_child]
         pub(super) queue_append : TemplateChild<gtk4::Button>,
+
+        #[template_child]
+        pub(super) play_track : TemplateChild<gtk4::Button>,
     }
 
     #[glib::object_subclass]
@@ -152,6 +156,9 @@ mod imp {
             self.queue_append.connect_clicked(glib::clone!(@weak obj => move |_btn| {
                 obj.trigger_action_append_queue();
             }));
+            self.play_track.connect_clicked(glib::clone!(@weak obj => move |_btn| {
+                obj.trigger_action_play_track();
+            }));
 
             self.parent_constructed(obj);
         }
@@ -178,7 +185,16 @@ impl ListTrackRow {
         let track_data : TrackData = list_item.property::<TrackData>("item");
 
         let track_id = track_data.track_id();
-        self.activate_action("app.playback-queue-append", Some(&track_id.to_variant()))
+        self.activate_action(utils::ApplicationActions::QueueAppendTrack.call(), Some(&track_id.to_variant()))
             .expect("Failed to activate playback-queue-append Action!");
+    }
+
+    fn trigger_action_play_track(&self) {
+        let list_item = self.property::<gtk4::ListItem>("list-item");
+        let track_data : TrackData = list_item.property::<TrackData>("item");
+
+        let track_id = track_data.track_id();
+        self.activate_action(utils::ApplicationActions::PlayTrack.call(), Some(&track_id.to_variant()))
+            .expect("Failed to activate PlayTrack Action!");
     }
 }
