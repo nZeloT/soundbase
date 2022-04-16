@@ -16,7 +16,7 @@ mod playback_api;
 type LibraryClient = services::library_client::LibraryClient<tonic::transport::Channel>;
 type PlaybackClient = services::playback_controls_client::PlaybackControlsClient<tonic::transport::Channel>;
 
-pub use api_base::ApiRuntime;
+pub use api_base::AsyncRuntime;
 use crate::api::playback_api::{PlaybackRequest, PlaybackResponse};
 
 ///
@@ -45,7 +45,7 @@ impl ApiTypes for LibraryApi {
 
 
 impl LibraryApi {
-    pub fn new(rt : ApiRuntime, api_address : String) -> Self {
+    pub fn new(rt : AsyncRuntime, api_address : String) -> Self {
         Self(ApiBase::new(rt, api_address))
     }
 
@@ -56,6 +56,17 @@ impl LibraryApi {
             match response {
                 LibraryResponse::Track(track) => callback(track),
                 _ => unimplemented!("Received response other than track for a Track Request!")
+            }
+        })
+    }
+
+    pub fn load_albums<CB>(&self, offset : i32, limit : i32, callback : CB) -> Result<(), ApiError>
+    where CB : Fn(services::SimpleAlbum) + 'static {
+        let request = LibraryRequests::LoadPage(LibraryEntity::Album, offset, limit);
+        self.0.request(request, move |response| {
+            match response {
+                LibraryResponse::Album(album) => callback(album),
+                _ => unimplemented!("Recieved response othe than album for a Album Request!")
             }
         })
     }
@@ -110,7 +121,7 @@ impl ApiTypes for PlaybackApi {
 }
 
 impl PlaybackApi {
-    pub fn new(rt : ApiRuntime, address : String) -> Self {
+    pub fn new(rt : AsyncRuntime, address : String) -> Self {
         Self(ApiBase::new(rt, address))
     }
 

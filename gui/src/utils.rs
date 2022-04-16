@@ -46,3 +46,10 @@ impl ApplicationActions {
         }
     }
 }
+
+pub fn fmt_duration(duration_ms : i64) -> String {
+    let seconds: i64 = duration_ms / 1000;
+    let minutes: i64 = seconds / 60;
+    let minute_seconds = seconds - (60 * minutes);
+    format!("{:>2}:{:0>2}", minutes, minute_seconds)
+}

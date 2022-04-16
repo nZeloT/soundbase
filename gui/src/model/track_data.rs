@@ -13,6 +13,7 @@ mod imp {
     use gtk4::glib::{ParamSpec, Value};
     use gtk4::prelude::*;
     use gtk4::subclass::prelude::*;
+    use crate::utils;
 
     #[derive(Debug, Default)]
     pub struct TrackDataInt {
@@ -103,7 +104,7 @@ mod imp {
                 "durationMs" => {
                     let duration = value.get().unwrap();
                     self.data.borrow_mut().duration_ms = duration;
-                    self.data.borrow_mut().duration_fmt = TrackData::fmt_duration(duration);
+                    self.data.borrow_mut().duration_fmt = utils::fmt_duration(duration);
                 },
                 _ => panic!("Tried to set unknown property {:?}", pspec.name())
             }
@@ -121,15 +122,6 @@ mod imp {
                 "durationFmt" => self.data.borrow().duration_fmt.to_value(),
                 _ => panic!("Tried to read unknown property {:?}", pspec.name())
             }
-        }
-    }
-
-    impl TrackData {
-        fn fmt_duration(duration_ms : i64) -> String {
-            let seconds: i64 = duration_ms / 1000;
-            let minutes: i64 = seconds / 60;
-            let minute_seconds = seconds - (60 * minutes);
-            format!("{:>2}:{:0<2}", minutes, minute_seconds)
         }
     }
 }
@@ -167,6 +159,11 @@ impl TrackData {
     pub fn track_id(&self) -> i32 {
         let data : &RefCell<TrackDataInt> = self.imp().data.borrow();
         data.borrow().track_id
+    }
+
+    pub fn duration_ms(&self) -> i64 {
+        let data : &RefCell<TrackDataInt> = self.imp().data.borrow();
+        data.borrow().duration_ms
     }
 
     fn fmt_artists(track : &SimpleTrack) -> String {

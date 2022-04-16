@@ -169,6 +169,11 @@
                         <child type="start">
                             <object class="GtkLabel" id="playback_time_passed">
                                 <property name="label">0:00</property>
+                                <binding name="label">
+                                    <lookup name="playback-pos-fmt" type="PlaybackState">
+                                        <lookup name="state">PlaybackPane</lookup>
+                                    </lookup>
+                                </binding>
                             </object>
                         </child>
                         <child type="center">
@@ -177,9 +182,14 @@
                                 <property name="hexpand">true</property>
                                 <property name="adjustment">
                                     <object class="GtkAdjustment">
-                                        <property name="upper">1</property>
+                                        <property name="upper">100</property>
                                         <property name="lower">0</property>
                                         <property name="value">0</property>
+                                        <binding name="value">
+                                            <lookup name="playback-progress" type="PlaybackState">
+                                                <lookup name="state">PlaybackPane</lookup>
+                                            </lookup>
+                                        </binding>
                                     </object>
                                 </property>
                             </object>
@@ -187,6 +197,13 @@
                         <child type="end">
                             <object class="GtkLabel" id="playback_time_total">
                                 <property name="label">8:24</property>
+                                <binding name="label">
+                                    <lookup name="durationFmt" type="TrackData">
+                                        <lookup name="current-track" type="PlaybackState">
+                                            <lookup name="state">PlaybackPane</lookup>
+                                        </lookup>
+                                    </lookup>
+                                </binding>
                             </object>
                         </child>
                     </object>

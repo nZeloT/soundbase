@@ -3,9 +3,16 @@
     <gresource prefix="/org/nzelot/soundbase-gui/">
         <file compressed="true" preprocess="xml-stripblanks">main_window.ui</file>
         <file compressed="true" preprocess="xml-stripblanks">playback_pane.ui</file>
+        
+        <!-- Pages -->
         <file compressed="true" preprocess="xml-stripblanks">list_tracks_page.ui</file>
+        <file compressed="true" preprocess="xml-stripblanks">list_albums_page.ui</file>
         <file compressed="true" preprocess="xml-stripblanks">playback_page.ui</file>
+
+        <!-- Page Contents -->
         <file compressed="true" preprocess="xml-stripblanks">list_track_row_item.ui</file>
         <file compressed="true" preprocess="xml-stripblanks">list_track_row.ui</file>
+        <file compressed="true" preprocess="xml-stripblanks">list_albums_grid_item.ui</file>
+        <file compressed="true" preprocess="xml-stripblanks">list_albums_grid_item_element.ui</file>
     </gresource>
 </gresources>

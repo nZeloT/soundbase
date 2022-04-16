@@ -1,7 +1,7 @@
 use glib::Object;
 use gtk4::{glib};
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
-use crate::api::{LibraryApi, PlaybackApi};
+use crate::api::{LibraryApi, PlaybackApi, AsyncRuntime};
 use crate::api::services::PlaybackStateResponse;
 use crate::application::Application;
 
@@ -13,6 +13,7 @@ mod imp {
     use gtk4::{CompositeTemplate};
     use adw::subclass::prelude::AdwApplicationWindowImpl;
     use crate::ui::list_tracks_page::ListTracksPage;
+    use crate::ui::list_albums_page::ListAlbumsPage;
     use crate::ui::playback_page::PlaybackPage;
     use crate::ui::playback_pane::PlaybackPane;
 
@@ -24,6 +25,9 @@ mod imp {
 
         #[template_child]
         pub(super) list_tracks_page : TemplateChild<ListTracksPage>,
+
+        #[template_child]
+        pub(super) list_albums_page : TemplateChild<ListAlbumsPage>,
 
         #[template_child]
         pub(super) playback_page : TemplateChild<PlaybackPage>,
@@ -46,6 +50,7 @@ mod imp {
 
         fn class_init(klass: &mut Self::Class) {
             ListTracksPage::static_type();
+            ListAlbumsPage::static_type();
             PlaybackPage::static_type();
             PlaybackPane::static_type();
             Self::bind_template(klass);
@@ -94,9 +99,11 @@ impl MainWindow {
             .expect("Failed to create MainWindow")
     }
 
-    pub fn init_api_for_pages(&self, api_library: &LibraryApi, api_playback : &PlaybackApi) {
+    pub fn init_api_for_pages(&self, async_runtime : &AsyncRuntime, api_library: &LibraryApi, api_playback : &PlaybackApi) {
         self.imp().list_tracks_page.get().init_api(api_library);
+        self.imp().list_albums_page.get().init_api(api_library);
         self.imp().playback_page.get().init_api(api_playback);
+        self.imp().playback_pane.get().init(async_runtime);
     }
 
     pub fn propagate_playback_state(&self, new_state : &PlaybackStateResponse) {

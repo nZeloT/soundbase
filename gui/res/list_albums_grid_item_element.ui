@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <template class="ListAlbumsItemElement" parent="GtkBox">
+        <property name="orientation">vertical</property>
+        <property name="spacing">5</property>
+        <property name="margin-top">2</property>
+        <property name="margin-bottom">2</property>
+        <property name="margin-start">2</property>
+        <property name="margin-end">2</property>
+
+        <child>
+            <object class="GtkOverlay">
+
+                <child>
+                    <object class="GtkBox">
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">5</property>
+
+                            <child>
+                                <object class="GtkImage">
+                                    <property name="name">album-art</property>
+                                    <property name="icon-name">media-optical-symbolic</property>
+                                    <property name="pixel-size">128</property>
+                                </object>
+                            </child>
+                            <child>
+                                <object class="GtkLabel" id="lbl_name">
+                                    <property name="label">This is an Album</property>
+                                    <binding name="label">
+                                        <lookup name="name" type="SimpleAlbumData">
+                                            <lookup name="item" type="GtkListItem">
+                                                <lookup name="list-item">ListAlbumsItemElement</lookup>
+                                            </lookup>
+                                        </lookup>
+                                    </binding>
+                                    <property name="max-width-chars">20</property>
+                                    <property name="ellipsize">PANGO_ELLIPSIZE_END</property>
+                                    <property name="halign">start</property>
+                                        <style>
+                                            <class name="caption-heading"/>
+                                        </style>
+                                </object>
+                            </child>
+                            <child>
+                                <object class="GtkLabel">
+                                    <property name="label">Album Artists</property>
+                                    <property name="halign">start</property>
+                                </object>
+                            </child>
+                    </object>
+                </child>
+
+
+                <child type="overlay">
+
+                    <object class="GtkBox">
+                        <property name="orientation">horizontal</property>
+                        <style>
+                            <class name="linked"/>
+                        </style>
+                        <child>
+                            <object class="GtkToggleButton">
+                                <binding name="icon-name">
+                                    <lookup name="favedIcon" type="TrackData">
+                                        <lookup name="item" type="GtkListItem">
+                                            <lookup name="list-item">ListAlbumsItemElement</lookup>
+                                        </lookup>
+                                    </lookup>
+                                </binding>
+                                <property name="valign">center</property>
+                                <binding name="visible">
+                                    <lookup name="is-highlighted">ListAlbumsItemElement</lookup>
+                                </binding>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="GtkButton" id="queue_append">
+                                <property name="icon-name">list-add-symbolic</property>
+                                <property name="valign">center</property>
+                                <binding name="visible">
+                                    <lookup name="is-highlighted">ListAlbumsItemElement</lookup>
+                                </binding>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="GtkButton">
+                                <property name="icon-name">view-more-symbolic</property>
+                                <property name="valign">center</property>
+                                <binding name="visible">
+                                    <lookup name="is-highlighted">ListAlbumsItemElement</lookup>
+                                </binding>
+                            </object>
+                        </child>
+                    </object>
+
+                </child>
+
+            </object>
+        </child>
+
+        
+    </template>
+</interface>

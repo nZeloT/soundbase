@@ -25,10 +25,14 @@ pub trait ApiClientBase : Clone + Send + 'static {
 }
 
 #[derive(Clone, Debug)]
-pub struct ApiRuntime(Arc<tokio::runtime::Runtime>);
-impl ApiRuntime {
+pub struct AsyncRuntime(Arc<tokio::runtime::Runtime>);
+impl AsyncRuntime {
     pub fn new() -> Self {
         Self(Arc::new(tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap()))
+    }
+
+    pub fn rt(&self) -> Arc<tokio::runtime::Runtime> {
+        self.0.clone()
     }
 }
 
@@ -50,7 +54,7 @@ impl<T, R> ApiRequest<T, R> {
 #[derive(Clone, Debug)]
 pub struct ApiBase<API>
     where API : ApiTypes + Clone {
-    _rt : ApiRuntime,
+    _rt : AsyncRuntime,
 
     ///
     /// Used to blocking send messages from the Api interface used by the UI
@@ -63,7 +67,7 @@ pub struct ApiBase<API>
 impl<API> ApiBase<API>
 where API : ApiTypes + Clone {
 
-    pub fn new(rt : ApiRuntime, address : String) -> Self {
+    pub fn new(rt : AsyncRuntime, address : String) -> Self {
         let (tx, mut rx) : (tokio::sync::mpsc::UnboundedSender<ApiRequest<API::Request, API::Response>>,
                             tokio::sync::mpsc::UnboundedReceiver<ApiRequest<API::Request, API::Response>>)
             = tokio::sync::mpsc::unbounded_channel();

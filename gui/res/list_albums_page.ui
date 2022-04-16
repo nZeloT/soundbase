@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <!-- define the album list store -->
+    <object class ="GListStore" id="album_list">
+        <property name="item-type">SimpleAlbumData</property>
+    </object>
+    <!-- define the selection mode and model -->
+    <object class="GtkSingleSelection" id="album_selection_model">
+        <property name="model">album_list</property>
+    </object>
+
+    <template class="ListAlbumsPage" parent="GtkBox">
+        <property name="orientation">vertical</property>
+        <property name="vexpand">true</property>
+        <property name="hexpand">true</property>
+        <child>
+            <object class="GtkScrolledWindow" id="scrolled_window">
+                <property name="min-content-width">400</property>
+                <property name="vexpand">true</property>
+                <property name="child">
+                    <!-- the list view displaying the tracks -->
+                    <object class="GtkGridView" id="album_grid_view">
+                        <property name="margin-top">10</property>
+                        <property name="margin-bottom">10</property>
+                        <property name="margin-start">10</property>
+                        <property name="margin-end">10</property>
+
+                        <!-- setting the selection model and therewith transitively the list store -->
+                        <property name="model">album_selection_model</property>
+
+                        <!-- setting the widget factory to create the row widgets as needed -->
+                        <property name="factory">
+                            <object class="GtkBuilderListItemFactory" id="album_item_factory">
+                                <property name="resource">/org/nzelot/soundbase-gui/list_albums_grid_item.ui</property>
+                            </object>
+                        </property>
+                    </object>
+                </property>
+            </object>
+        </child>
+    </template>
+</interface>

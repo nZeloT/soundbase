@@ -2,6 +2,8 @@ use gtk4::prelude::ObjectExt;
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
 use crate::api::services::SimpleTrack;
 use crate::model::track_data::TrackData;
+use crate::utils;
+use crate::api::services::PlaybackStateResponse;
 
 mod imp {
     use std::cell::{Cell, RefCell};
@@ -22,6 +24,10 @@ mod imp {
         pub(super) playing_icon : RefCell<String>,
         pub(super) has_previous : Cell<bool>,
         pub(super) has_next : Cell<bool>,
+
+        pub(super) playback_track_start : Cell<i64>,
+        pub(super) playback_pos_fmt : RefCell<String>,
+        pub(super) playback_progress : Cell<i32>,
     }
 
     #[glib::object_subclass]
@@ -53,6 +59,15 @@ mod imp {
                     ),
                     glib::ParamSpecBoolean::new(
                         "has-next", "has-next", "has-next", false, glib::ParamFlags::READWRITE,
+                    ),
+                    glib::ParamSpecInt64::new(
+                        "playback-track-start", "playback-track-start", "playback-track-start", i64::MIN, i64::MAX, 0 as i64, glib::ParamFlags::READWRITE,
+                    ),
+                    glib::ParamSpecString::new(
+                        "playback-pos-fmt", "playback-pos-fmt", "playback-pos-fmt", Some("0:00"), glib::ParamFlags::READWRITE,
+                    ),
+                    glib::ParamSpecInt::new(
+                        "playback-progress", "playback-progress", "playback-progress", i32::MIN, i32::MAX, 0 as i32, glib::ParamFlags::READWRITE,
                     ),
                 ]
             });
@@ -86,6 +101,18 @@ mod imp {
                     let has_next = value.get().unwrap();
                     self.has_next.replace(has_next);
                 },
+                "playback-track-start" => {
+                    let playback_pos_ms = value.get().unwrap();
+                    self.playback_track_start.replace(playback_pos_ms);
+                },
+                "playback-pos-fmt" => {
+                    let playback_pos_fmt = value.get().unwrap();
+                    self.playback_pos_fmt.replace(playback_pos_fmt);
+                },
+                "playback-progress" => {
+                    let playback_progress = value.get().unwrap();
+                    self.playback_progress.replace(playback_progress);
+                }
                 _ => unimplemented!()
             }
         }
@@ -98,6 +125,9 @@ mod imp {
                 "playing-icon" => self.playing_icon.borrow().to_value(),
                 "has-previous" => self.has_previous.get().to_value(),
                 "has-next" => self.has_next.get().to_value(),
+                "playback-track-start" => self.playback_track_start.get().to_value(),
+                "playback-pos-fmt" => self.playback_pos_fmt.borrow().to_value(),
+                "playback-progress" => self.playback_progress.get().to_value(),
                 _ => unimplemented!()
             }
         }
@@ -144,6 +174,51 @@ impl PlaybackState {
 
     pub fn set_has_previous(&self, has_previous : bool) {
         self.set_property("has-previous", has_previous);
+    }
+
+    pub fn set_playback_track_start(&self, new_start_time : i64) {
+        let delta_time = chrono::offset::Utc::now().timestamp_millis() - new_start_time;
+        self.set_property("playback-track-start", new_start_time);
+        self.set_property("playback-pos-fmt", utils::fmt_duration(delta_time));
+        self.set_property("playback-progress", 0);
+    }
+
+    pub fn has_current_track(&self) -> bool {
+        self.imp().has_current_track.get()
+    }
+
+    pub fn update_from_server_response(&self, state_update : &PlaybackStateResponse) {
+        log::info!("Received Playback State Update {:?}", state_update);
+        let mut song_change = false;
+        let old_track_id = self.imp().current_track.borrow().track_id();
+
+        self.set_is_playing(state_update.is_playing);
+        self.set_has_previous(state_update.has_previous);
+        self.set_has_next(state_update.has_next);
+        let has_current_track = state_update.playing_track.is_some();
+
+        self.set_has_current_track(has_current_track);
+
+        if let Some(track) = &state_update.playing_track {
+            log::info!("Updating current track!");
+            song_change = track.track_id != old_track_id && track.track_id != 0;
+            self.set_current_track(track);
+        }
+
+        self.update_playback_position(song_change);
+    }
+
+    pub fn update_playback_position(&self, track_changed : bool) {
+        if track_changed {
+            self.set_playback_track_start(chrono::offset::Utc::now().timestamp_millis());
+        }else{
+            let delta_time = chrono::offset::Utc::now().timestamp_millis() - self.imp().playback_track_start.get();
+            self.set_property("playback-pos-fmt", utils::fmt_duration(delta_time));
+
+            let dur_ms = self.imp().current_track.borrow().duration_ms();
+            let progress : i32 = (( (delta_time as f64) / (dur_ms as f64) ) * 100 as f64) as i32;
+            self.set_property("playback-progress", progress);
+        }
     }
 }
 

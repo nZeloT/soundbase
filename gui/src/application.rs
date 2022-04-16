@@ -1,4 +1,4 @@
-use crate::api::{ApiRuntime, LibraryApi, PlaybackApi};
+use crate::api::{AsyncRuntime, LibraryApi, PlaybackApi};
 use crate::ui::main_window::MainWindow;
 use crate::{config, utils};
 use adw::gtk;
@@ -21,6 +21,7 @@ mod imp {
 
         pub(super) api_library: OnceCell<LibraryApi>,
         pub(super) api_playback: OnceCell<PlaybackApi>,
+        pub(super) async_runtime : OnceCell<AsyncRuntime>,
     }
 
     #[glib::object_subclass]
@@ -45,6 +46,7 @@ mod imp {
         }
 
         fn startup(&self, application: &Self::Type) {
+            application.setup_async_runtime();
             application.setup_api_connections();
             application.setup_actions();
             self.parent_startup(application);
@@ -185,18 +187,36 @@ impl Application {
         );
     }
 
+    fn setup_async_runtime(&self) {
+        let async_runtime = AsyncRuntime::new();
+        self.imp().async_runtime.set(async_runtime).unwrap();
+    }
+
     fn setup_api_connections(&self) {
         let api_address =
             std::env::var("API_URL").unwrap_or("http://philly.local:3333".to_string());
-        let api_runtime = ApiRuntime::new();
+        let api_runtime = self
+            .imp()
+            .async_runtime
+            .get()
+            .expect("Async Runtime is not initialized!");  
+        
+        
         let api_library = LibraryApi::new(api_runtime.clone(), api_address.clone());
-        let api_playback = PlaybackApi::new(api_runtime, api_address.clone());
+        let api_playback = PlaybackApi::new(api_runtime.clone(), api_address.clone());
+
         self.imp().api_library.set(api_library.clone()).unwrap();
         self.imp().api_playback.set(api_playback.clone()).unwrap();
         log::info!("Connected to {}", api_address);
     }
 
     fn distribute_api_connections(&self) {
+        let async_runtime = self
+            .imp()
+            .async_runtime
+            .get()
+            .expect("Async Runtime is not Initialized!");
+
         let api_library = self
             .imp()
             .api_library
@@ -209,7 +229,7 @@ impl Application {
             .get()
             .expect("Playback API is not initialized!");
 
-        self.window().init_api_for_pages(api_library, api_playback);
+        self.window().init_api_for_pages(async_runtime, api_library, api_playback);
     }
 
     fn init_ui_state(&self) {

@@ -203,8 +203,7 @@
                                         <property name="name">albums</property>
                                         <property name="title">Albums</property>
                                         <property name="child">
-                                            <object class="GtkLabel">
-                                                <property name="label">Albums</property>
+                                            <object class="ListAlbumsPage" id="list_albums_page">
                                             </object>
                                         </property>
                                     </object>
